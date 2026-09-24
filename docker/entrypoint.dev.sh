@@ -23,5 +23,8 @@ done
 echo "✅ Database available. Applying 'prisma db push'..."
 npx dotenv -e /app/.env -- npx prisma db push --accept-data-loss
 
+echo "🔧 Generating Prisma client..."
+npx dotenv -e /app/.env -- npx prisma generate
+
 echo "🚀 Starting application..."
 exec npm run dev
