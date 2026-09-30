@@ -118,6 +118,12 @@
     </a>
   {/if}
 
+  {#if user.p_news}
+    <a href="/dashboard/sync" class:active={page.url.pathname == '/dashboard/sync'}>
+      <i class="fa-solid fa-arrows-rotate"></i>Sync
+    </a>
+  {/if}
+
   {#if leftPanelOpen}
     <button class="account" onclick={accountClick}>
       <i class="fa-solid fa-circle-user"></i>{user.username}<i class="fa-solid fa-caret-up"></i>
