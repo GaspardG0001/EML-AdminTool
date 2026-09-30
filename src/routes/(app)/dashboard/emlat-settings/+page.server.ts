@@ -146,7 +146,8 @@ export const actions: Actions = {
       p_stats_1: form.get('p_stats_1') === 'on',
       p_stats_2: form.get('p_stats_2') === 'on',
       p_crashReports_1: form.get('p_crash-reports_1') === 'on',
-      p_crashReports_2: form.get('p_crash-reports_2') === 'on'
+      p_crashReports_2: form.get('p_crash-reports_2') === 'on',
+      p_sync: form.get('p_sync') === 'on'
     }
 
     const result = editUserSchema.safeParse(raw)
@@ -175,6 +176,7 @@ export const actions: Actions = {
     const p_backgrounds = result.data.p_backgrounds ? 1 : 0
     const p_stats = getStatsPermissions(result)
     const p_crashReports = getCrashReportsPermissions(result)
+    const p_sync = result.data.p_sync ? 1 : 0
 
     try {
       await Promise.all([
@@ -188,7 +190,8 @@ export const actions: Actions = {
           p_newsTags,
           p_backgrounds,
           p_stats,
-          p_crashReports
+          p_crashReports,
+          p_sync
         }),
         updateUserProfilePermissions(userId, p_filesUpdater)
       ])
@@ -312,7 +315,8 @@ async function refuseDeleteUser(event: RequestEvent<any>) {
       p_newsTags: 0,
       p_backgrounds: 0,
       p_stats: 0,
-      p_crashReports: 0
+      p_crashReports: 0,
+      p_sync: 0
     })
   } catch (err) {
     if (err instanceof BusinessError) return fail(event, err.httpStatus, { failure: err.code })

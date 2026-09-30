@@ -149,7 +149,11 @@
         <p>View and delete crash reports</p>
       {/if}
 
-      {#if !data.userPermissions.some((p) => p.userId === selectedUserId && p.permission > 0) && !selectedUser.p_bootstraps && !selectedUser.p_maintenance && !selectedUser.p_news && !selectedUser.p_newsCategories && !selectedUser.p_newsTags && !selectedUser.p_backgrounds && !selectedUser.p_stats && !selectedUser.p_crashReports}
+      {#if selectedUser.p_sync}
+        <p>Access sync page</p>
+      {/if}
+
+      {#if !data.userPermissions.some((p) => p.userId === selectedUserId && p.permission > 0) && !selectedUser.p_bootstraps && !selectedUser.p_maintenance && !selectedUser.p_news && !selectedUser.p_newsCategories && !selectedUser.p_newsTags && !selectedUser.p_backgrounds && !selectedUser.p_stats && !selectedUser.p_crashReports && !selectedUser.p_sync}
         <p>No permissions</p>
       {/if}
     {/if}

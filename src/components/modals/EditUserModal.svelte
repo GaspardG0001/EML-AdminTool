@@ -32,6 +32,7 @@
   let p_stats_2 = $state(selectedUser.p_stats === 2)
   let p_crashReports_1 = $state(selectedUser.p_crashReports >= 1)
   let p_crashReports_2 = $state(selectedUser.p_crashReports === 2)
+  let p_sync = $state(selectedUser.p_sync === 1)
   let p_filesUpdater = $state(
     data.profiles.map((profile) => {
       const existing = data.userPermissions.find((p) => p.profileId === profile.id && p.userId === selectedUserId)
@@ -270,6 +271,15 @@
                 if (p_crashReports_2) p_crashReports_1 = true
               }}
             /> Delete crash reports
+          </label>
+        </div>
+      </div>
+
+      <div class="permission">
+        <p>Sync</p>
+        <div class="right">
+          <label class="p" for="p_sync">
+            <input type="checkbox" id="p_sync" name="p_sync" bind:checked={p_sync} /> Access sync page
           </label>
         </div>
       </div>
