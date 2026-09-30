@@ -82,11 +82,11 @@
     </a>
   {/if}
 
-  {#if user.p_bootstraps}
+  <!-- {#if user.p_bootstraps}
     <a href="/dashboard/bootstraps" class:active={page.url.pathname == '/dashboard/bootstraps'}>
       <i class="fa-solid fa-arrows-rotate"></i>Bootstraps
     </a>
-  {/if}
+  {/if} -->
 
   {#if user.p_maintenance}
     <a href="/dashboard/maintenance" class:active={page.url.pathname == '/dashboard/maintenance'}>
@@ -94,11 +94,11 @@
     </a>
   {/if}
 
-  {#if user.p_news}
+  <!-- {#if user.p_news}
     <a href="/dashboard/news" class:active={page.url.pathname == '/dashboard/news'}>
       <i class="fa-solid fa-newspaper"></i>News
     </a>
-  {/if}
+  {/if} -->
 
   {#if user.p_backgrounds}
     <a href="/dashboard/backgrounds" class:active={page.url.pathname == '/dashboard/backgrounds'}>
