@@ -1,7 +1,7 @@
 import { HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
-import { errors, jwtVerify } from 'jose'
-import { createHash } from 'node:crypto'
+import { errors, jwtVerify, SignJWT } from 'jose'
+import { createHash, randomUUID } from 'node:crypto'
 import { db } from '$lib/server/db'
 import { decryptS3Credential } from '$lib/server/s3-configuration'
 import { getBearerToken, readLimitedText } from '$lib/server/request'
@@ -45,6 +45,20 @@ export interface UploadRequest {
   deviceId: string
 }
 
+export interface SyncHandshakeRequest {
+  accessToken: string
+  deviceId: string
+  deviceName: string
+  platform: string
+  arch: string | null
+  launcherVersion: string | null
+}
+
+export interface VerifiedMinecraftProfile {
+  uuid: string
+  name: string
+}
+
 let cachedStorage: { cacheKey: string; storage: SyncStorage } | undefined
 
 function getJwtSecret(): Uint8Array {
@@ -52,7 +66,133 @@ function getJwtSecret(): Uint8Array {
   if (!secret || secret === 'undefined') {
     throw new SyncApiError('Player authentication is not configured', 'SYNC_AUTH_NOT_CONFIGURED', 503)
   }
+  if (Buffer.byteLength(secret, 'utf8') < 32) {
+    throw new SyncApiError('JWT_SECRET_KEY must contain at least 32 bytes', 'SYNC_AUTH_NOT_CONFIGURED', 503)
+  }
   return new TextEncoder().encode(secret)
+}
+
+export function assertSyncAuthConfigured(): void {
+  getJwtSecret()
+}
+
+function getPlayerTokenTtlSeconds(): number {
+  const raw = process.env.SYNC_PLAYER_TOKEN_TTL_SECONDS
+  if (!raw) return 900
+
+  const ttl = Number(raw)
+  if (!Number.isInteger(ttl) || ttl < 60 || ttl > 3600) {
+    throw new SyncApiError('SYNC_PLAYER_TOKEN_TTL_SECONDS must be between 60 and 3600', 'SYNC_CONFIGURATION_INVALID', 500)
+  }
+  return ttl
+}
+
+export async function createSyncPlayerToken(playerId: string): Promise<{ token: string; expiresAt: Date }> {
+  const issuedAt = Math.floor(Date.now() / 1000)
+  const ttlSeconds = getPlayerTokenTtlSeconds()
+  const token = await new SignJWT({ scope: 'sync-player', playerId })
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setJti(randomUUID())
+    .setIssuer('eml-admintool')
+    .setAudience('eml-sync')
+    .setIssuedAt(issuedAt)
+    .setExpirationTime(issuedAt + ttlSeconds)
+    .sign(getJwtSecret())
+
+  return { token, expiresAt: new Date((issuedAt + ttlSeconds) * 1000) }
+}
+
+export function parseSyncHandshakeRequest(input: unknown): SyncHandshakeRequest {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new SyncApiError('Request body must be an object', 'INVALID_REQUEST', 400)
+  }
+
+  const body = input as Record<string, unknown>
+  if (Object.keys(body).some((key) => !['accessToken', 'deviceId', 'deviceName', 'platform', 'arch', 'launcherVersion'].includes(key))) {
+    throw new SyncApiError('Request body contains unsupported fields', 'INVALID_REQUEST', 400)
+  }
+  if (
+    typeof body.accessToken !== 'string' ||
+    body.accessToken.length < 16 ||
+    body.accessToken.length > 8192 ||
+    /[\u0000-\u001f\u007f]/.test(body.accessToken)
+  ) {
+    throw new SyncApiError('A valid Minecraft access token is required', 'INVALID_ACCESS_TOKEN', 400)
+  }
+  if (typeof body.deviceId !== 'string' || !/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(body.deviceId)) {
+    throw new SyncApiError('deviceId must be a stable UUID', 'INVALID_DEVICE', 400)
+  }
+  if (typeof body.deviceName !== 'string' || !body.deviceName.trim() || body.deviceName.trim().length > 64) {
+    throw new SyncApiError('deviceName must be between 1 and 64 characters', 'INVALID_DEVICE', 400)
+  }
+  if (typeof body.platform !== 'string' || !['win32', 'darwin', 'linux'].includes(body.platform)) {
+    throw new SyncApiError('platform is not supported', 'INVALID_DEVICE', 400)
+  }
+  if (body.arch !== undefined && body.arch !== null && (typeof body.arch !== 'string' || !/^[\w-]{1,32}$/.test(body.arch))) {
+    throw new SyncApiError('arch is invalid', 'INVALID_DEVICE', 400)
+  }
+  if (
+    body.launcherVersion !== undefined &&
+    body.launcherVersion !== null &&
+    (typeof body.launcherVersion !== 'string' || !/^[\w.+-]{1,64}$/.test(body.launcherVersion))
+  ) {
+    throw new SyncApiError('launcherVersion is invalid', 'INVALID_DEVICE', 400)
+  }
+
+  return {
+    accessToken: body.accessToken,
+    deviceId: body.deviceId.toLowerCase(),
+    deviceName: body.deviceName.trim(),
+    platform: body.platform,
+    arch: typeof body.arch === 'string' ? body.arch : null,
+    launcherVersion: typeof body.launcherVersion === 'string' ? body.launcherVersion : null
+  }
+}
+
+export async function verifyMinecraftAccessToken(accessToken: string): Promise<VerifiedMinecraftProfile> {
+  let response: Response
+  try {
+    response = await fetch('https://api.minecraftservices.com/minecraft/profile', {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+      signal: AbortSignal.timeout(8000)
+    })
+  } catch {
+    throw new SyncApiError('Minecraft identity provider is unavailable', 'IDENTITY_PROVIDER_UNAVAILABLE', 503)
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    throw new SyncApiError('Minecraft access token is invalid or expired', 'INVALID_ACCESS_TOKEN', 401)
+  }
+  if (response.status === 404) {
+    throw new SyncApiError('The Microsoft account has no Minecraft Java profile', 'MINECRAFT_PROFILE_REQUIRED', 403)
+  }
+  if (!response.ok) {
+    console.error(`Minecraft identity verification failed with HTTP ${response.status}`)
+    throw new SyncApiError('Minecraft identity provider could not verify the account', 'IDENTITY_PROVIDER_UNAVAILABLE', 503)
+  }
+
+  let profile: unknown
+  try {
+    profile = await response.json()
+  } catch {
+    throw new SyncApiError('Minecraft identity provider returned an invalid response', 'IDENTITY_PROVIDER_INVALID_RESPONSE', 502)
+  }
+
+  if (!profile || typeof profile !== 'object') {
+    throw new SyncApiError('Minecraft identity provider returned an invalid response', 'IDENTITY_PROVIDER_INVALID_RESPONSE', 502)
+  }
+  const result = profile as { id?: unknown; name?: unknown }
+  if (
+    typeof result.id !== 'string' ||
+    !/^(?:[\da-f]{32}|[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12})$/i.test(result.id) ||
+    typeof result.name !== 'string' ||
+    !result.name.trim() ||
+    result.name.length > 64
+  ) {
+    throw new SyncApiError('Minecraft identity provider returned an invalid profile', 'IDENTITY_PROVIDER_INVALID_RESPONSE', 502)
+  }
+
+  return { uuid: result.id.replace(/-/g, '').toLowerCase(), name: result.name }
 }
 
 export async function authenticateSyncPlayer(request: Request): Promise<Player> {
@@ -61,7 +201,7 @@ export async function authenticateSyncPlayer(request: Request): Promise<Player> 
 
   let payload
   try {
-    payload = (await jwtVerify(token, getJwtSecret(), { audience: 'eml-sync' })).payload
+    payload = (await jwtVerify(token, getJwtSecret(), { audience: 'eml-sync', issuer: 'eml-admintool', algorithms: ['HS256'] })).payload
   } catch (err) {
     if (
       err instanceof errors.JWTExpired ||

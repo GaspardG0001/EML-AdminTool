@@ -93,14 +93,13 @@ SYNC_ENABLED=false
 SYNC_DEFAULT_PLAYER_QUOTA=5368709120
 SYNC_DEFAULT_MAX_FILE_SIZE=1073741824
 SYNC_SIGNED_URL_TTL=900
+SYNC_PLAYER_TOKEN_TTL_SECONDS=900
 SYNC_S3_FORCE_PATH_STYLE=false
 ```
 
 For browser-based launchers, configure the object-storage bucket's CORS policy to allow the launcher origin to perform `PUT` requests with the `x-amz-checksum-sha256` header.
 
-The upload routes require a server-issued bearer JWT with audience `eml-sync`, scope `sync-player` and a `playerId` claim, signed with `JWT_SECRET_KEY`. The current profile authentication token does not identify a player and is intentionally rejected. No player identity proof/issuer is currently integrated: do not enable Sync for launcher traffic until a trusted EML authentication flow has verified the player and issued this token. A Minecraft UUID or pseudo sent by the launcher is not an identity proof.
-
-The intended handshake is `POST /api/sync/auth/handshake`: the launcher supplies its existing EML authentication proof and stable device metadata; the server verifies the proof with the trusted identity provider, normalizes the verified Minecraft UUID, upserts the player/device, then issues a short-lived `eml-sync` token. This handshake is not exposed until the provider and proof format are identified. Sync profile rules and device registration also need trusted setup before uploads can be accepted.
+The launcher obtains a player token via `POST /api/sync/auth/handshake`. The route verifies the Microsoft/Minecraft access token against Minecraft Services, derives the player UUID from the verified response (never from a client-supplied UUID), upserts the player and device, and issues a short-lived bearer JWT with audience `eml-sync` and scope `sync-player`. The JWT is signed with `JWT_SECRET_KEY`; the existing profile token is not accepted for player Sync. See [launcher authentication integration](./docs/SYNC-LAUNCHER-AUTH.md) for the request contract and Electron guidance. Sync remains disabled unless `SYNC_ENABLED=true`.
 
 ## Comparison with other approaches
 
