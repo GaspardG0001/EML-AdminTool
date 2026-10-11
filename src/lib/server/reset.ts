@@ -66,6 +66,10 @@ export async function markAsUnconfigured(): Promise<void> {
   resetProcessEnv()
   const databaseUrl = process.env.DATABASE_URL ?? defaultPgURL
   const jwtSecretKey = process.env.JWT_SECRET_KEY ?? randomBytes(64).toString('base64url')
+  const s3EncryptionKey =
+    process.env.S3_ENCRYPTION_KEY && process.env.S3_ENCRYPTION_KEY !== 'undefined'
+      ? process.env.S3_ENCRYPTION_KEY
+      : randomBytes(32).toString('hex')
 
   const envFile = envPath
 
@@ -95,6 +99,7 @@ ${devWarning}
 IS_CONFIGURED="false"
 DATABASE_URL="${databaseUrl}"
 JWT_SECRET_KEY="${jwtSecretKey}"
+S3_ENCRYPTION_KEY="${s3EncryptionKey}"
 BODY_SIZE_LIMIT=16M`
 
   try {

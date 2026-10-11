@@ -78,6 +78,10 @@ The _Crash Reports_ feature allows you to collect and analyze crash reports from
 
 _Read the [docs](https://emlproject.pages.dev/docs/eml-admintool/administration-and-features/crash-reports)._
 
+### S3 configuration
+
+The _Sync_ page stores S3 bucket settings in the database. Access key credentials are encrypted with AES-256-GCM using the `S3_ENCRYPTION_KEY` generated during setup (or on first save for existing installations). Keep the generated key in the application's environment file, share it across application instances, and include it in secure backups: without it, saved S3 credentials cannot be decrypted.
+
 ## Comparison with other approaches
 
 Managing a modpack server-side can be done in several ways. Here is how EML AdminTool compares to common alternatives.
@@ -114,4 +118,3 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on how to contribute to 
 - This repository contains a `.env` file. All the information in this file is fake (random strings), and will be replaced by the real information when you install EML AdminTool.
 - This Web software is under the `GNU AGPLv3` license; to get more information, please read the file `LICENSE`. It is legally obligatory to respect this license.
 - If you need some help, you can join [this Discord](https://emlproject.com/discord/github).
-

@@ -118,7 +118,7 @@
     </a>
   {/if}
 
-  {#if user.p_sync}
+  {#if user.isAdmin || user.p_sync}
     <a href="/dashboard/sync" class:active={page.url.pathname == '/dashboard/sync'}>
       <i class="fa-solid fa-arrows-rotate"></i>Sync
     </a>

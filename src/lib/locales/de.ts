@@ -85,6 +85,8 @@ export default {
     [NotificationCode.BACKGROUND_NAME_TOO_LONG]: `Der Hintergrundname darf höchstens 255 Zeichen lang sein.`,
     [NotificationCode.BACKGROUND_INVALID_STATUS]: `Hintergrundstatus ist ungültig.`,
     [NotificationCode.BACKGROUND_ALREADY_EXISTS]: `Ein Hintergrund mit diesem Namen existiert bereits.`,
+    [NotificationCode.S3_CONFIGURATION_SAVED]: `S3-Konfiguration erfolgreich gespeichert.`,
+    [NotificationCode.S3_ENCRYPTION_KEY_INVALID]: `Der serverseitige S3-Verschlüsselungsschlüssel fehlt oder ist ungültig. Konfigurieren Sie die Anwendung erneut, bevor Sie Zugangsdaten speichern.`,
 
     [NotificationCode.DATABASE_ERROR]: `Datenbankfehler.`,
     [NotificationCode.UPDATER_ERROR]: `Updater-Fehler.`,
@@ -142,6 +144,20 @@ Wenn du uns bei der Übersetzung des EML AdminTools helfen möchtest, findest du
   },
   dashboard: {
     welcome: `Willkommen, {{username}}!`,
+    s3Configuration: {
+      title: `S3-Konfiguration`,
+      region: `Region`,
+      accessKeyId: `Kennung (Access Key ID)`,
+      secretAccessKey: `Zugriffsschlüssel`,
+      bucket: `Bucket`,
+      endpoint: `Endpunkt`,
+      save: `Konfiguration speichern`,
+      saved: `Die Zugangsdaten werden verschlüsselt gespeichert. Lassen Sie beide Zugangsfelder leer, um die vorhandenen Werte beizubehalten.`,
+      secretPlaceholder: `Geheimen Zugriffsschlüssel eingeben`,
+      requiredSecretPlaceholder: `Bei der Ersteinrichtung erforderlich`,
+      endpointPlaceholder: `https://s3.example.com`,
+      saving: `Wird gespeichert...`
+    },
     emlatSettings: {
       title: `EML AdminTool Einstellungen`,
       info: {

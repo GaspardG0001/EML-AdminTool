@@ -302,6 +302,25 @@ export const backgroundSchema = z
     message: NotificationCode.MISSING_INPUT
   })
 
+export const s3ConfigurationSchema = z.object({
+  region: z.string().trim().min(1).max(128),
+  accessKeyId: z.string().trim().max(256),
+  secretAccessKey: z.string().max(4096),
+  bucket: z.string().trim().min(1).max(255),
+  endpoint: z
+    .string()
+    .trim()
+    .url()
+    .max(2048)
+    .refine((value) => {
+      try {
+        return ['http:', 'https:'].includes(new URL(value).protocol)
+      } catch {
+        return false
+      }
+    })
+})
+
 export const crashReportSchema = z.object({
   crashReportId: z.string(),
   comment: z.string().optional().or(z.null()),

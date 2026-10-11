@@ -88,6 +88,8 @@ export default {
     [NotificationCode.BACKGROUND_NAME_TOO_LONG]: `Background name must be at most 255 characters long.`,
     [NotificationCode.BACKGROUND_INVALID_STATUS]: `Background status is invalid.`,
     [NotificationCode.BACKGROUND_ALREADY_EXISTS]: `Background with this name already exists.`,
+    [NotificationCode.S3_CONFIGURATION_SAVED]: `S3 configuration saved successfully.`,
+    [NotificationCode.S3_ENCRYPTION_KEY_INVALID]: `The server-side S3 encryption key is missing or invalid. Reconfigure the application before saving credentials.`,
 
     [NotificationCode.NOT_FOUND_ERROR]: `Not found.`,
     [NotificationCode.DATABASE_ERROR]: `Database error.`,
@@ -147,6 +149,20 @@ Therefore, if you would like to help us translate EML AdminTool, you can find th
   },
   dashboard: {
     welcome: `Welcome, {{username}}!`,
+    s3Configuration: {
+      title: `S3 configuration`,
+      region: `Region`,
+      accessKeyId: `Identifier (Access Key ID)`,
+      secretAccessKey: `Access key`,
+      bucket: `Bucket`,
+      endpoint: `Endpoint`,
+      save: `Save configuration`,
+      saved: `Credentials are saved encrypted. Leave both credential fields blank to keep the existing values.`,
+      secretPlaceholder: `Enter the secret access key`,
+      requiredSecretPlaceholder: `Required for the initial configuration`,
+      endpointPlaceholder: `https://s3.example.com`,
+      saving: `Saving...`
+    },
     time: `Server time`,
     serverStatus: `Server status`,
     undefinedServer: `The Minecraft server information is not defined.`,
@@ -296,4 +312,3 @@ Moreover, be sure that nobody can access EML AdminTool during the reset: EML Adm
     }
   }
 }
-

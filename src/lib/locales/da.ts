@@ -85,6 +85,8 @@ export default {
     [NotificationCode.BACKGROUND_NAME_TOO_LONG]: `Baggrundsnavnet må højst være 255 tegn langt.`,
     [NotificationCode.BACKGROUND_INVALID_STATUS]: `Baggrundsstatus er ugyldig.`,
     [NotificationCode.BACKGROUND_ALREADY_EXISTS]: `En baggrund med dette navn findes allerede.`,
+    [NotificationCode.S3_CONFIGURATION_SAVED]: `S3-konfigurationen blev gemt.`,
+    [NotificationCode.S3_ENCRYPTION_KEY_INVALID]: `Serverens S3-krypteringsnøgle mangler eller er ugyldig. Konfigurer programmet igen, før du gemmer legitimationsoplysninger.`,
 
     [NotificationCode.DATABASE_ERROR]: `Databasefejl.`,
     [NotificationCode.UPDATER_ERROR]: `Updater-fejl.`,
@@ -142,6 +144,20 @@ Hvis du vil hjælpe med at oversætte EML AdminTool, kan du finde JSON-filerne p
   },
   dashboard: {
     welcome: `Velkommen, {{username}}!`,
+    s3Configuration: {
+      title: `S3-konfiguration`,
+      region: `Region`,
+      accessKeyId: `Identifikator (Access Key ID)`,
+      secretAccessKey: `Adgangsnøgle`,
+      bucket: `Bucket`,
+      endpoint: `Slutpunkt`,
+      save: `Gem konfiguration`,
+      saved: `Legitimationsoplysningerne gemmes krypteret. Lad begge legitimationsfelter være tomme for at beholde de eksisterende værdier.`,
+      secretPlaceholder: `Indtast den hemmelige adgangsnøgle`,
+      requiredSecretPlaceholder: `Påkrævet ved første konfiguration`,
+      endpointPlaceholder: `https://s3.example.com`,
+      saving: `Gemmer...`
+    },
     emlatSettings: {
       title: `EML AdminTool indstillinger`,
       info: {

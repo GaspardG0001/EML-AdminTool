@@ -85,6 +85,8 @@ export default {
     [NotificationCode.BACKGROUND_NAME_TOO_LONG]: `Il nome dello sfondo deve contenere al massimo 255 caratteri.`,
     [NotificationCode.BACKGROUND_INVALID_STATUS]: `Lo stato dello sfondo non è valido.`,
     [NotificationCode.BACKGROUND_ALREADY_EXISTS]: `Uno sfondo con questo nome esiste già.`,
+    [NotificationCode.S3_CONFIGURATION_SAVED]: `Configurazione S3 salvata correttamente.`,
+    [NotificationCode.S3_ENCRYPTION_KEY_INVALID]: `La chiave di cifratura S3 lato server è assente o non valida. Riconfigura l'applicazione prima di salvare le credenziali.`,
 
     [NotificationCode.DATABASE_ERROR]: `Errore del database.`,
     [NotificationCode.UPDATER_ERROR]: `Errore dell'updater.`,
@@ -142,6 +144,20 @@ Se desideri aiutarci a tradurre EML AdminTool, puoi trovare i file JSON sul nost
   },
   dashboard: {
     welcome: `Benvenuto, {{username}}!`,
+    s3Configuration: {
+      title: `Configurazione S3`,
+      region: `Regione`,
+      accessKeyId: `Identificativo (Access Key ID)`,
+      secretAccessKey: `Chiave di accesso`,
+      bucket: `Bucket`,
+      endpoint: `Endpoint`,
+      save: `Salva configurazione`,
+      saved: `Le credenziali vengono salvate in forma cifrata. Lascia vuoti entrambi i campi delle credenziali per mantenere i valori esistenti.`,
+      secretPlaceholder: `Inserisci la chiave di accesso segreta`,
+      requiredSecretPlaceholder: `Obbligatorio per la configurazione iniziale`,
+      endpointPlaceholder: `https://s3.example.com`,
+      saving: `Salvataggio...`
+    },
     emlatSettings: {
       title: `Impostazioni EML AdminTool`,
       info: {
