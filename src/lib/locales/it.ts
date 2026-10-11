@@ -152,8 +152,6 @@ Se desideri aiutarci a tradurre EML AdminTool, puoi trovare i file JSON sul nost
       bucket: `Bucket`,
       endpoint: `Endpoint`,
       save: `Salva configurazione`,
-      saved: `Le credenziali vengono salvate in forma cifrata. Lascia vuoti entrambi i campi delle credenziali per mantenere i valori esistenti.`,
-      secretPlaceholder: `Inserisci la chiave di accesso segreta`,
       requiredSecretPlaceholder: `Obbligatorio per la configurazione iniziale`,
       endpointPlaceholder: `https://s3.example.com`,
       saving: `Salvataggio...`

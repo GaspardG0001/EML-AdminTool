@@ -152,8 +152,6 @@ Hvis du vil hjælpe med at oversætte EML AdminTool, kan du finde JSON-filerne p
       bucket: `Bucket`,
       endpoint: `Slutpunkt`,
       save: `Gem konfiguration`,
-      saved: `Legitimationsoplysningerne gemmes krypteret. Lad begge legitimationsfelter være tomme for at beholde de eksisterende værdier.`,
-      secretPlaceholder: `Indtast den hemmelige adgangsnøgle`,
       requiredSecretPlaceholder: `Påkrævet ved første konfiguration`,
       endpointPlaceholder: `https://s3.example.com`,
       saving: `Gemmer...`

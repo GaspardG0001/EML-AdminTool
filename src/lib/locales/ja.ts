@@ -152,8 +152,6 @@ EML AdminToolの翻訳にご協力いただける場合は、GitHubでJSONファ
       bucket: `バケット`,
       endpoint: `エンドポイント`,
       save: `設定を保存`,
-      saved: `認証情報は暗号化して保存されます。既存の値を保持するには、両方の認証情報欄を空欄にしてください。`,
-      secretPlaceholder: `シークレットアクセスキーを入力`,
       requiredSecretPlaceholder: `初回設定時に必須`,
       endpointPlaceholder: `https://s3.example.com`,
       saving: `保存中...`

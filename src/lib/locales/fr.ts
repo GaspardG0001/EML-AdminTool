@@ -151,8 +151,6 @@ Ainsi, si vous souhaitez nous aider à traduire l'EML AdminTool, vous pourrez tr
       bucket: `Bucket`,
       endpoint: `Point de terminaison`,
       save: `Enregistrer la configuration`,
-      saved: `Les identifiants sont enregistrés de manière chiffrée. Laissez les deux champs d'identification vides pour conserver les valeurs actuelles.`,
-      secretPlaceholder: `Saisissez la clé d'accès secrète`,
       requiredSecretPlaceholder: `Obligatoire lors de la première configuration`,
       endpointPlaceholder: `https://s3.exemple.com`,
       saving: `Enregistrement...`

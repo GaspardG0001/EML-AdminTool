@@ -14,15 +14,22 @@
     } | null
   }
 
+  const credentialMask = '••••••••••••'
+
   let { configuration }: Props = $props()
-  let accessKeyId = $state('')
-  let secretAccessKey = $state('')
+  let region = $state(configuration?.region ?? '')
+  let bucket = $state(configuration?.bucket ?? '')
+  let endpoint = $state(configuration?.endpoint ?? '')
+  let accessKeyId = $state(configuration?.credentialsConfigured ? credentialMask : '')
+  let secretAccessKey = $state(configuration?.credentialsConfigured ? credentialMask : '')
   let credentialsSaved = $state(false)
   let hasCredentials = $derived(Boolean(configuration?.credentialsConfigured || credentialsSaved))
   let saving = $state(false)
 
-  const enhanceForm: SubmitFunction = () => {
+  const enhanceForm: SubmitFunction = ({ formData }) => {
     saving = true
+    if (formData.get('accessKeyId') === credentialMask) formData.set('accessKeyId', '')
+    if (formData.get('secretAccessKey') === credentialMask) formData.set('secretAccessKey', '')
 
     return async ({ result, update }) => {
       saving = false
@@ -33,8 +40,8 @@
         addNotification('ERROR', message)
       } else if (result.type === 'success') {
         credentialsSaved = true
-        accessKeyId = ''
-        secretAccessKey = ''
+        accessKeyId = credentialMask
+        secretAccessKey = credentialMask
         addNotification('SUCCESS', $l.notifications.S3_CONFIGURATION_SAVED)
       }
 
@@ -51,7 +58,7 @@
         id="s3-region"
         name="region"
         type="text"
-        value={configuration?.region ?? ''}
+        bind:value={region}
         placeholder="eu-west-1"
         required
         maxlength="128"
@@ -65,7 +72,10 @@
         name="accessKeyId"
         type="text"
         bind:value={accessKeyId}
-        placeholder={hasCredentials ? '••••••••' : ''}
+        onfocus={() => {
+          if (accessKeyId === credentialMask) accessKeyId = ''
+        }}
+        placeholder=""
         autocomplete="off"
         required={!hasCredentials}
         maxlength="256"
@@ -79,9 +89,10 @@
         name="secretAccessKey"
         type="password"
         bind:value={secretAccessKey}
-        placeholder={hasCredentials
-          ? $l.dashboard.s3Configuration.secretPlaceholder
-          : $l.dashboard.s3Configuration.requiredSecretPlaceholder}
+        onfocus={() => {
+          if (secretAccessKey === credentialMask) secretAccessKey = ''
+        }}
+        placeholder={hasCredentials ? '' : $l.dashboard.s3Configuration.requiredSecretPlaceholder}
         autocomplete="new-password"
         required={!hasCredentials}
         maxlength="4096"
@@ -90,7 +101,7 @@
 
     <div>
       <label for="s3-bucket">{$l.dashboard.s3Configuration.bucket}</label>
-      <input id="s3-bucket" name="bucket" type="text" value={configuration?.bucket ?? ''} required maxlength="255" />
+      <input id="s3-bucket" name="bucket" type="text" bind:value={bucket} required maxlength="255" />
     </div>
 
     <div class="endpoint">
@@ -99,17 +110,13 @@
         id="s3-endpoint"
         name="endpoint"
         type="url"
-        value={configuration?.endpoint ?? ''}
+        bind:value={endpoint}
         placeholder={$l.dashboard.s3Configuration.endpointPlaceholder}
         required
         maxlength="2048"
       />
     </div>
   </div>
-
-  {#if hasCredentials}
-    <p class="saved-note" aria-live="polite">{$l.dashboard.s3Configuration.saved}</p>
-  {/if}
 
   <button class="primary" type="submit" disabled={saving}>
     {saving ? $l.dashboard.s3Configuration.saving : $l.dashboard.s3Configuration.save}
@@ -130,12 +137,6 @@
 
     .endpoint {
       grid-column: 1 / -1;
-    }
-
-    .saved-note {
-      color: #666;
-      font-size: 13px;
-      margin-bottom: 0;
     }
   }
 

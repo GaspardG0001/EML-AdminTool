@@ -152,8 +152,6 @@ Wenn du uns bei der Übersetzung des EML AdminTools helfen möchtest, findest du
       bucket: `Bucket`,
       endpoint: `Endpunkt`,
       save: `Konfiguration speichern`,
-      saved: `Die Zugangsdaten werden verschlüsselt gespeichert. Lassen Sie beide Zugangsfelder leer, um die vorhandenen Werte beizubehalten.`,
-      secretPlaceholder: `Geheimen Zugriffsschlüssel eingeben`,
       requiredSecretPlaceholder: `Bei der Ersteinrichtung erforderlich`,
       endpointPlaceholder: `https://s3.example.com`,
       saving: `Wird gespeichert...`

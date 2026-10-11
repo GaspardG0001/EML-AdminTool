@@ -157,8 +157,6 @@ Therefore, if you would like to help us translate EML AdminTool, you can find th
       bucket: `Bucket`,
       endpoint: `Endpoint`,
       save: `Save configuration`,
-      saved: `Credentials are saved encrypted. Leave both credential fields blank to keep the existing values.`,
-      secretPlaceholder: `Enter the secret access key`,
       requiredSecretPlaceholder: `Required for the initial configuration`,
       endpointPlaceholder: `https://s3.example.com`,
       saving: `Saving...`
