@@ -17,6 +17,8 @@
     "docker-down": "docker compose -f docker/docker-compose.dev.yml down --rmi all -v"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1149.0",
+    "@aws-sdk/s3-request-presigner": "^3.1149.0",
     "@codemirror/autocomplete": "^6.20.3",
     "@codemirror/commands": "^6.10.4",
     "@codemirror/lang-json": "^6.0.2",

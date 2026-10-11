@@ -82,6 +82,26 @@ _Read the [docs](https://emlproject.pages.dev/docs/eml-admintool/administration-
 
 The _Sync_ page stores S3 bucket settings in the database. Access key credentials are encrypted with AES-256-GCM using the `S3_ENCRYPTION_KEY` generated during setup (or on first save for existing installations). Keep the generated key in the application's environment file, share it across application instances, and include it in secure backups: without it, saved S3 credentials cannot be decrypted.
 
+### Player Sync upload API
+
+The player upload API uses a two-step flow. `POST /api/sync/profiles/:profileId/upload/prepare` validates the path, device, file size, quota and base version, then returns a short-lived, checksum-bound S3 `PUT` URL. The launcher uploads directly to that URL and calls `POST /api/sync/profiles/:profileId/upload/:uploadId/commit`; the AdminTool never proxies the file contents.
+
+Set the following server-side variables in `env/.env` to enable uploads. S3 endpoint, bucket and credentials continue to come from the Sync page configuration.
+
+```env
+SYNC_ENABLED=false
+SYNC_DEFAULT_PLAYER_QUOTA=5368709120
+SYNC_DEFAULT_MAX_FILE_SIZE=1073741824
+SYNC_SIGNED_URL_TTL=900
+SYNC_S3_FORCE_PATH_STYLE=false
+```
+
+For browser-based launchers, configure the object-storage bucket's CORS policy to allow the launcher origin to perform `PUT` requests with the `x-amz-checksum-sha256` header.
+
+The upload routes require a server-issued bearer JWT with audience `eml-sync`, scope `sync-player` and a `playerId` claim, signed with `JWT_SECRET_KEY`. The current profile authentication token does not identify a player and is intentionally rejected. No player identity proof/issuer is currently integrated: do not enable Sync for launcher traffic until a trusted EML authentication flow has verified the player and issued this token. A Minecraft UUID or pseudo sent by the launcher is not an identity proof.
+
+The intended handshake is `POST /api/sync/auth/handshake`: the launcher supplies its existing EML authentication proof and stable device metadata; the server verifies the proof with the trusted identity provider, normalizes the verified Minecraft UUID, upserts the player/device, then issues a short-lived `eml-sync` token. This handshake is not exposed until the provider and proof format are identified. Sync profile rules and device registration also need trusted setup before uploads can be accepted.
+
 ## Comparison with other approaches
 
 Managing a modpack server-side can be done in several ways. Here is how EML AdminTool compares to common alternatives.

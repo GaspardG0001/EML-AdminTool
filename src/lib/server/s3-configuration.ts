@@ -1,4 +1,4 @@
-import { createCipheriv, randomBytes } from 'node:crypto'
+import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { ServerError } from '$lib/utils/errors'
@@ -39,4 +39,20 @@ export function encryptS3Credential(value: string): string {
   const ciphertext = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()])
 
   return [iv, cipher.getAuthTag(), ciphertext].map((part) => part.toString('base64url')).join('.')
+}
+
+export function decryptS3Credential(value: string): string {
+  const [encodedIv, encodedTag, encodedCiphertext, ...extra] = value.split('.')
+  if (!encodedIv || !encodedTag || !encodedCiphertext || extra.length > 0) {
+    throw new ServerError('Stored S3 credential is malformed', undefined, NotificationCode.S3_ENCRYPTION_KEY_INVALID, 500)
+  }
+
+  try {
+    const decipher = createDecipheriv('aes-256-gcm', getEncryptionKey(), Buffer.from(encodedIv, 'base64url'))
+    decipher.setAuthTag(Buffer.from(encodedTag, 'base64url'))
+    return Buffer.concat([decipher.update(Buffer.from(encodedCiphertext, 'base64url')), decipher.final()]).toString('utf8')
+  } catch (err) {
+    console.error('Failed to decrypt an S3 credential:', err)
+    throw new ServerError('Stored S3 credential could not be decrypted', err, NotificationCode.S3_ENCRYPTION_KEY_INVALID, 500)
+  }
 }

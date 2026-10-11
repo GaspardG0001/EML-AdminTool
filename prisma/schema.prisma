@@ -46,6 +46,18 @@ enum StatAction {
   BOOTSTRAP
 }
 
+enum SyncRuleAction {
+  INCLUDE
+  EXCLUDE
+}
+
+enum SyncUploadState {
+  PENDING
+  COMMITTED
+  EXPIRED
+  ABORTED
+}
+
 model Environment {
   id        String   @id @default(cuid(2))
   language  String   @default("en")
@@ -53,6 +65,16 @@ model Environment {
   theme     String   @default("default")
   pin       String   @default("000")
   updatedAt DateTime @updatedAt
+}
+
+model S3Configuration {
+  id                       String   @id @default("1")
+  region                   String
+  accessKeyIdEncrypted     String
+  secretAccessKeyEncrypted String
+  bucket                   String
+  endpoint                 String
+  updatedAt                DateTime @updatedAt
 }
 
 model User {
@@ -115,6 +137,10 @@ model Profile {
   allowedPseudos  String[]                @default([])
   password        String?
   userPermissions UserProfilePermission[]
+  syncProfile     SyncProfile?
+  syncFiles       SyncFile[]
+  syncStates      PlayerSyncState[]
+  syncUploads     SyncUpload[]
 }
 
 model Bootstrap {
@@ -219,4 +245,128 @@ model UserProfilePermission {
   updatedAt  DateTime @updatedAt
 
   @@unique([userId, profileId])
+}
+
+model Player {
+  id            String  @id @default(cuid(2))
+  minecraftUuid String  @unique
+  minecraftName String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  devices     PlayerDevice[]
+  syncFiles   SyncFile[]
+  syncStates  PlayerSyncState[]
+  syncUploads SyncUpload[]
+}
+
+model PlayerDevice {
+  id              String  @id @default(cuid(2))
+  playerId        String
+  deviceUuid      String
+  name            String
+  platform        String
+  arch            String?
+  launcherVersion String?
+
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  player      Player       @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  syncFiles   SyncFile[]
+  syncUploads SyncUpload[]
+
+  @@unique([playerId, deviceUuid])
+  @@index([playerId])
+}
+
+model SyncProfile {
+  id              String   @id @default(cuid(2))
+  profileId       String   @unique
+  enabled         Boolean  @default(false)
+  maxStorageBytes BigInt?
+  maxFileBytes    BigInt?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  profile Profile    @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  rules   SyncRule[]
+
+  @@index([enabled])
+}
+
+model SyncRule {
+  id            String         @id @default(cuid(2))
+  syncProfileId String
+  path          String
+  action        SyncRuleAction @default(INCLUDE)
+  enabled       Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  syncProfile SyncProfile @relation(fields: [syncProfileId], references: [id], onDelete: Cascade)
+
+  @@index([syncProfileId])
+}
+
+model SyncFile {
+  id        String   @id @default(cuid(2))
+  playerId  String
+  profileId String
+  path      String
+  hash      String?
+  size      BigInt   @default(0)
+  version   Int      @default(1)
+  deleted   Boolean  @default(false)
+  objectKey String?
+  deviceId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  player  Player        @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  profile Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  device  PlayerDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@unique([playerId, profileId, path])
+  @@index([playerId, profileId])
+  @@index([hash])
+}
+
+model PlayerSyncState {
+  id        String   @id @default(cuid(2))
+  playerId  String
+  profileId String
+  revision  BigInt   @default(0)
+  updatedAt DateTime @updatedAt
+
+  player  Player  @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, profileId])
+}
+
+model SyncUpload {
+  id            String          @id @default(cuid(2))
+  playerId      String
+  profileId     String
+  deviceId      String
+  path          String
+  hash          String
+  size          BigInt
+  baseVersion   Int?
+  objectKey     String
+  reservedBytes BigInt          @default(0)
+  state         SyncUploadState @default(PENDING)
+  createdAt     DateTime        @default(now())
+  expiresAt     DateTime
+  committedAt   DateTime?
+
+  player  Player       @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  profile Profile      @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  device  PlayerDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([playerId, profileId])
+  @@index([expiresAt])
+  @@index([playerId, profileId, path, state])
 }
