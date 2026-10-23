@@ -1,3 +1,4 @@
+import { getSyncStatistics } from '$lib/server/sync-metrics'
 import { error, redirect, type Actions } from '@sveltejs/kit'
 import { fail } from '$lib/server/action'
 import { db } from '$lib/server/db'
@@ -24,7 +25,17 @@ export const load = (async (event) => {
       }
     })
 
+    const search = (event.url.searchParams.get('search') ?? '').slice(0, 100)
+    const cursor = event.url.searchParams.get('cursor') || undefined
+    const players = await db.player.findMany({
+      where: { ...(search ? { OR: [{ minecraftName: { contains: search, mode: 'insensitive' } }, { minecraftUuid: { contains: search.replace(/-/g, '').toLowerCase() } }] } : {}), ...(cursor ? { id: { gt: cursor } } : {}) },
+      include: { _count: { select: { devices: true, syncFiles: { where: { deleted: false } } } }, syncStates: { select: { updatedAt: true }, orderBy: { updatedAt: 'desc' }, take: 1 } }, orderBy: { id: 'asc' }, take: 51
+    })
+    const usage = await db.syncFile.groupBy({ by: ['playerId'], where: { playerId: { in: players.slice(0, 50).map((p) => p.id) }, deleted: false }, _sum: { size: true } })
     return {
+      statistics: await getSyncStatistics(), search,
+      players: players.slice(0, 50).map((p) => ({ ...p, storageBytes: (usage.find((u) => u.playerId === p.id)?._sum.size ?? 0n).toString() })), nextCursor: players.length > 50 ? players[49].id : null,
+      canConfigure: event.locals.user?.isAdmin || [1, 3].includes(event.locals.user?.p_sync ?? 0),
       profiles: await db.profile.findMany({ select: { id: true, name: true, syncProfile: { select: { enabled: true } } }, orderBy: { name: 'asc' } }),
       configuration: configuration
         ? {
@@ -43,7 +54,7 @@ export const load = (async (event) => {
 
 export const actions: Actions = {
   save: async (event) => {
-    if (!event.locals.user?.isAdmin && !event.locals.user?.p_sync) {
+    if (!event.locals.user?.isAdmin && ![1, 3].includes(event.locals.user?.p_sync ?? 0)) {
       return fail(event, 403, { failure: NotificationCode.FORBIDDEN })
     }
 
@@ -99,6 +110,7 @@ export const actions: Actions = {
         }
       })
 
+      await db.log.create({ data: { userId: event.locals.user!.id, action: 'sync.storage.configuration.modified' } })
       return { success: true }
     } catch (err) {
       if (err instanceof ServerError) {

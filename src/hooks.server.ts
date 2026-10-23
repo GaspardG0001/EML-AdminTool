@@ -14,7 +14,12 @@ import fs from 'node:fs/promises'
 import stream from 'node:stream'
 import { createReadStream } from 'node:fs'
 import mime from 'mime-types'
-import { dev } from '$app/environment'
+import { dev, building } from '$app/environment'
+import { runSyncMaintenance } from '$lib/server/sync-maintenance'
+if (!building) {
+  const syncMaintenanceTimer = setInterval(() => void runSyncMaintenance(), 5 * 60 * 1000)
+  syncMaintenanceTimer.unref()
+}
 import { sequence } from '@sveltejs/kit/hooks'
 import '$lib/utils/prototypes'
 import { protectedProfilesCache } from '$lib/server/profile'
@@ -321,7 +326,7 @@ function getUserInfo(user: User, profilePermissions: { profileId: string; name: 
     p_backgrounds: user.p_backgrounds as 0 | 1,
     p_stats: user.p_stats as 0 | 1 | 2,
     p_crashReports: user.p_crashReports as 0 | 1 | 2,
-    p_sync: user.p_sync as 0 | 1,
+    p_sync: user.p_sync as 0 | 1 | 2 | 3,
     isAdmin: user.isAdmin,
     profilePermissions: profilePermissions as { profileId: string; name: string; slug: string; permission: 0 | 1 | 2 }[]
   }

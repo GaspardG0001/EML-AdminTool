@@ -9,7 +9,10 @@ test('portable relative paths and Windows separators', () => {
   }
 })
 test('explicit inclusion, exclusion precedence and recursive globs', () => {
-  const rules = [{ path: 'saves/**', action: 'INCLUDE' }, { path: 'saves/**/session.lock', action: 'EXCLUDE' }]
+  const rules = [
+    { path: 'saves/**', action: 'INCLUDE' },
+    { path: 'saves/**/session.lock', action: 'EXCLUDE' }
+  ]
   assert.ok(isSyncPathAllowed('saves/world/level.dat', rules))
   assert.equal(isSyncPathAllowed('saves/session.lock', rules), false)
   assert.equal(isSyncPathAllowed('saves/world/session.lock', rules), false)

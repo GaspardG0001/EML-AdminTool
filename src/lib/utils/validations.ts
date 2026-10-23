@@ -117,7 +117,7 @@ export const editUserSchema = z.object({
   p_stats_2: z.boolean(),
   p_crashReports_1: z.boolean(),
   p_crashReports_2: z.boolean(),
-  p_sync: z.boolean()
+  p_sync: z.number().int().min(0).max(3)
 })
 
 export const editAccountSchema = z

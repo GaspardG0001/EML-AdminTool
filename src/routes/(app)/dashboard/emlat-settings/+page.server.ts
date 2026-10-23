@@ -147,7 +147,7 @@ export const actions: Actions = {
       p_stats_2: form.get('p_stats_2') === 'on',
       p_crashReports_1: form.get('p_crash-reports_1') === 'on',
       p_crashReports_2: form.get('p_crash-reports_2') === 'on',
-      p_sync: form.get('p_sync') === 'on'
+      p_sync: Number(form.get('p_sync') ?? 0)
     }
 
     const result = editUserSchema.safeParse(raw)
@@ -176,7 +176,7 @@ export const actions: Actions = {
     const p_backgrounds = result.data.p_backgrounds ? 1 : 0
     const p_stats = getStatsPermissions(result)
     const p_crashReports = getCrashReportsPermissions(result)
-    const p_sync = result.data.p_sync ? 1 : 0
+    const p_sync = result.data.p_sync
 
     try {
       await Promise.all([

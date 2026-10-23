@@ -9,7 +9,9 @@ export const GET: RequestHandler = async ({ request }) => {
     assertSyncEnabled()
     const devices = await db.playerDevice.findMany({ where: { playerId: player.id }, omit: { playerId: true }, orderBy: { lastSeenAt: 'desc' } })
     return Response.json({ devices })
-  } catch (err) { return syncErrorResponse(err) }
+  } catch (err) {
+    return syncErrorResponse(err)
+  }
 }
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -17,9 +19,29 @@ export const POST: RequestHandler = async ({ request }) => {
     const player = await authenticateSyncPlayer(request)
     assertSyncEnabled()
     const body = objectBody(await readSyncJson(request))
-    const input = parseSyncHandshakeRequest({ accessToken: 'validated-player-token', deviceId: body.deviceUuid, deviceName: body.name, platform: body.platform, arch: body.arch, launcherVersion: body.launcherVersion })
-    const data = { name: input.deviceName, platform: input.platform, arch: input.arch, launcherVersion: input.launcherVersion, lastSeenAt: new Date() }
-    const device = await db.playerDevice.upsert({ where: { playerId_deviceUuid: { playerId: player.id, deviceUuid: input.deviceId } }, create: { playerId: player.id, deviceUuid: input.deviceId, ...data }, update: data, omit: { playerId: true } })
+    const input = parseSyncHandshakeRequest({
+      accessToken: 'validated-player-token',
+      deviceId: body.deviceUuid,
+      deviceName: body.name,
+      platform: body.platform,
+      arch: body.arch,
+      launcherVersion: body.launcherVersion
+    })
+    const data = {
+      name: input.deviceName,
+      platform: input.platform,
+      arch: input.arch,
+      launcherVersion: input.launcherVersion,
+      lastSeenAt: new Date()
+    }
+    const device = await db.playerDevice.upsert({
+      where: { playerId_deviceUuid: { playerId: player.id, deviceUuid: input.deviceId } },
+      create: { playerId: player.id, deviceUuid: input.deviceId, ...data },
+      update: data,
+      omit: { playerId: true }
+    })
     return Response.json({ device })
-  } catch (err) { return syncErrorResponse(err) }
+  } catch (err) {
+    return syncErrorResponse(err)
+  }
 }

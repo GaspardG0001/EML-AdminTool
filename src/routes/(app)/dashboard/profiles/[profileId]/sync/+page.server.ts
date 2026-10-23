@@ -6,15 +6,23 @@ import type { Actions, PageServerLoad } from './$types'
 
 export const load: PageServerLoad = async ({ locals, params }) => {
   if (!locals.user?.isAdmin && !locals.user?.p_sync) throw redirect(303, '/dashboard')
-  const profile = await db.profile.findUnique({ where: { id: params.profileId }, select: { id: true, name: true, syncProfile: { include: { rules: { orderBy: { id: 'asc' } } } } } })
+  const profile = await db.profile.findUnique({
+    where: { id: params.profileId },
+    select: { id: true, name: true, syncProfile: { include: { rules: { orderBy: { id: 'asc' } } } } }
+  })
   if (!profile) throw error(404, 'Profile not found')
   const config = getSyncRuntimeConfig()
-  return { profile, globallyEnabled: process.env.SYNC_ENABLED === 'true', defaults: { maxStorageBytes: config.defaultPlayerQuota.toString(), maxFileBytes: config.defaultMaxFileSize.toString() } }
+  return {
+    canConfigure: locals.user?.isAdmin || [1, 3].includes(locals.user?.p_sync ?? 0),
+    profile,
+    globallyEnabled: process.env.SYNC_ENABLED === 'true',
+    defaults: { maxStorageBytes: config.defaultPlayerQuota.toString(), maxFileBytes: config.defaultMaxFileSize.toString() }
+  }
 }
 
 export const actions: Actions = {
   default: async ({ locals, params, request }) => {
-    if (!locals.user?.isAdmin && !locals.user?.p_sync) throw error(403)
+    if (!locals.user?.isAdmin && ![1, 3].includes(locals.user?.p_sync ?? 0)) throw error(403)
     const form = await request.formData()
     try {
       const limit = (key: string) => {
@@ -35,12 +43,30 @@ export const actions: Actions = {
       })
       const data = { enabled: form.get('enabled') === 'on', maxStorageBytes: limit('maxStorageBytes'), maxFileBytes: limit('maxFileBytes') }
       await db.$transaction(async (tx) => {
-        const profile = await tx.syncProfile.upsert({ where: { profileId: params.profileId }, create: { profileId: params.profileId, ...data }, update: data })
+        const profile = await tx.syncProfile.upsert({
+          where: { profileId: params.profileId },
+          create: { profileId: params.profileId, ...data },
+          update: data
+        })
         await tx.syncRule.deleteMany({ where: { syncProfileId: profile.id } })
         await tx.syncRule.createMany({ data: rules.map((r) => ({ ...r, syncProfileId: profile.id })) })
-        await tx.log.create({ data: { userId: locals.user!.id, action: 'sync.configuration.modified', details: JSON.stringify({ profileId: params.profileId, ...data, maxStorageBytes: data.maxStorageBytes?.toString(), maxFileBytes: data.maxFileBytes?.toString(), rules }) } })
+        await tx.log.create({
+          data: {
+            userId: locals.user!.id,
+            action: 'sync.configuration.modified',
+            details: JSON.stringify({
+              profileId: params.profileId,
+              ...data,
+              maxStorageBytes: data.maxStorageBytes?.toString(),
+              maxFileBytes: data.maxFileBytes?.toString(),
+              rules
+            })
+          }
+        })
       })
       return { success: true }
-    } catch { return fail(400, { message: 'Vérifiez les limites et les chemins relatifs des règles.' }) }
+    } catch {
+      return fail(400, { message: 'Vérifiez les limites et les chemins relatifs des règles.' })
+    }
   }
 }

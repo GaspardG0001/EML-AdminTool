@@ -81,7 +81,7 @@
   }
 </script>
 
-<a href={`/dashboard/profiles/${selectedProfileId}/sync`}>Synchronisation des données joueur</a>
+<a href={`/dashboard/profiles/${selectedProfileId}/sync`}>Synchronisation des donnÃ©es joueur</a>
 
 
 {#if showEditProfileModal}

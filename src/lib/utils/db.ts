@@ -73,7 +73,7 @@ export type UserInfo = {
   p_backgrounds: 0 | 1
   p_stats: 0 | 1 | 2
   p_crashReports: 0 | 1 | 2
-  p_sync: 0 | 1
+  p_sync: 0 | 1 | 2 | 3
   profilePermissions: UserProfilePermissionInfo[]
 }
 

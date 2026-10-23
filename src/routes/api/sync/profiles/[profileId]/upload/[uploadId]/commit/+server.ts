@@ -1,4 +1,5 @@
-import { assertSyncWritable } from '$lib/server/sync-api'
+import { lockSyncObject } from '$lib/server/sync-maintenance'
+import { assertSyncWritable, checkVersion } from '$lib/server/sync-api'
 import { json } from '@sveltejs/kit'
 import { Prisma } from '@prisma/client'
 import { db } from '$lib/server/db'
@@ -44,6 +45,7 @@ export const POST: RequestHandler = async ({ request, params }) => {
 
     const committed = await db.$transaction(
       async (tx) => {
+        await lockSyncObject(tx, upload.objectKey)
         const currentFile = await tx.syncFile.findUnique({
           where: {
             playerId_profileId_path: {
@@ -53,9 +55,7 @@ export const POST: RequestHandler = async ({ request, params }) => {
             }
           }
         })
-        if ((currentFile?.version ?? null) !== upload.baseVersion) {
-          throw new SyncApiError('File version has changed', 'VERSION_CONFLICT', 409)
-        }
+        checkVersion(currentFile?.version ?? null, upload.baseVersion)
         if (currentFile && currentFile.version >= 2147483647) {
           throw new SyncApiError('File version limit has been reached', 'VERSION_LIMIT_REACHED', 409)
         }
@@ -144,6 +144,7 @@ export const POST: RequestHandler = async ({ request, params }) => {
           throw new SyncApiError('Upload session is no longer pending', 'UPLOAD_NOT_PENDING', 409)
         }
 
+        await tx.syncMetric.upsert({ where: { name: 'uploads_committed' }, create: { name: 'uploads_committed', count: 1n }, update: { count: { increment: 1n } } })
         return { file, revision: syncState.revision }
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }

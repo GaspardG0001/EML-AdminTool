@@ -1,3 +1,4 @@
+import { getSyncStatistics } from '$lib/server/sync-metrics'
 import { error, redirect, type Actions } from '@sveltejs/kit'
 import { fail } from '$lib/server/action'
 import type { PageServerLoad } from './$types'
@@ -112,7 +113,8 @@ export const load = (async (event) => {
       .map((bucket) => {
         const minStats = getStats(ramRawData[bucket].min)
         const maxStats = getStats(ramRawData[bucket].max)
-        return { date: bucket, min: minStats, max: maxStats }
+        return {
+ date: bucket, min: minStats, max: maxStats }
       })
 
     const mappings: Record<string, string> = {
@@ -155,6 +157,7 @@ export const load = (async (event) => {
     }
 
     return {
+      syncStatistics: (user.isAdmin || user.p_sync) ? await getSyncStatistics() : null,
       range,
       kpis: {
         totalLaunches,

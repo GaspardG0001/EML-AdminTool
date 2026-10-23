@@ -1,4 +1,5 @@
-import { HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { recordSyncMetric } from './sync-metrics'
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { errors, jwtVerify, SignJWT } from 'jose'
 import { createHash, randomUUID } from 'node:crypto'
@@ -20,7 +21,8 @@ export class SyncApiError extends Error {
   constructor(
     message: string,
     public readonly code: string,
-    public readonly status: number
+    public readonly status: number,
+    public readonly details: Record<string, unknown> = {}
   ) {
     super(message)
     this.name = 'SyncApiError'
@@ -247,15 +249,22 @@ export async function readSyncJson(request: Request): Promise<unknown> {
 }
 
 export function syncErrorResponse(err: unknown): Response {
+  if (err && typeof err === 'object' && 'code' in err && err.code === 'P2034') {
+    return syncErrorResponse(new SyncApiError('Concurrent update; retry synchronization', 'VERSION_CONFLICT', 409))
+  }
   if (err instanceof SyncApiError) {
-    return Response.json({ success: false, code: err.code, message: err.message }, { status: err.status })
+    void recordSyncMetric(err.code === 'VERSION_CONFLICT' ? 'conflicts' : err.code === 'QUOTA_EXCEEDED' ? 'quota_exceeded' : 'request_failures')
+    const aliases: Record<string, string> = { VERSION_CONFLICT: 'SYNC_CONFLICT', PATH_NOT_ALLOWED: 'SYNC_RULE_NOT_ALLOWED', INVALID_PATH: 'SYNC_INVALID_PATH', FILE_TOO_LARGE: 'SYNC_FILE_TOO_LARGE', QUOTA_EXCEEDED: 'SYNC_QUOTA_EXCEEDED', DEVICE_NOT_FOUND: 'SYNC_INVALID_DEVICE', UPLOAD_NOT_FOUND: 'SYNC_UPLOAD_NOT_FOUND', UPLOAD_EXPIRED: 'SYNC_UPLOAD_EXPIRED', UNAUTHORIZED: 'SYNC_UNAUTHORIZED' }
+    return Response.json({ success: false, code: err.code, error: aliases[err.code] ?? err.code, message: err.message, ...err.details }, { status: err.status })
   }
 
   if (err instanceof BusinessError) {
     return Response.json({ success: false, code: err.code, message: err.message }, { status: err.httpStatus })
   }
 
-  console.error('Unexpected Sync API error:', err)
+  void recordSyncMetric('request_failures')
+  // SDK errors can contain signed URLs or request headers.
+  console.error('Unexpected Sync API error', err instanceof Error ? err.name : 'unknown')
   return Response.json({ success: false, code: 'INTERNAL_SERVER_ERROR', message: 'Sync request failed' }, { status: 500 })
 }
 
@@ -296,7 +305,8 @@ export function getSyncRuntimeConfig(): SyncRuntimeConfig {
 }
 
 export async function getSyncStorage(): Promise<SyncStorage> {
-  const configuration = await db.s3Configuration.findUnique({ where: { id: '1' } })
+  const storedConfiguration = await db.s3Configuration.findUnique({ where: { id: '1' } })
+  const configuration = storedConfiguration ?? (process.env.SYNC_S3_ENDPOINT && process.env.SYNC_S3_REGION && process.env.SYNC_S3_BUCKET && process.env.SYNC_S3_ACCESS_KEY && process.env.SYNC_S3_SECRET_KEY ? { endpoint: process.env.SYNC_S3_ENDPOINT, region: process.env.SYNC_S3_REGION, bucket: process.env.SYNC_S3_BUCKET, updatedAt: new Date(0), accessKeyIdEncrypted: '', secretAccessKeyEncrypted: '' } : null)
   if (!configuration) throw new SyncApiError('S3 storage has not been configured', 'SYNC_STORAGE_NOT_CONFIGURED', 503)
 
   let endpoint: URL
@@ -319,6 +329,8 @@ export async function getSyncStorage(): Promise<SyncStorage> {
     .update(
       [
         configuration.updatedAt.toISOString(),
+        storedConfiguration ? '' : process.env.SYNC_S3_ACCESS_KEY ?? '',
+        storedConfiguration ? '' : process.env.SYNC_S3_SECRET_KEY ?? '',
         configuration.endpoint,
         configuration.region,
         configuration.bucket,
@@ -334,8 +346,8 @@ export async function getSyncStorage(): Promise<SyncStorage> {
     endpoint: configuration.endpoint,
     forcePathStyle: forcePathStyleRaw === 'true',
     credentials: {
-      accessKeyId: decryptS3Credential(configuration.accessKeyIdEncrypted),
-      secretAccessKey: decryptS3Credential(configuration.secretAccessKeyEncrypted)
+      accessKeyId: storedConfiguration ? decryptS3Credential(storedConfiguration.accessKeyIdEncrypted) : process.env.SYNC_S3_ACCESS_KEY!,
+      secretAccessKey: storedConfiguration ? decryptS3Credential(storedConfiguration.secretAccessKeyEncrypted) : process.env.SYNC_S3_SECRET_KEY!
     }
   })
   const storage = {
@@ -406,23 +418,41 @@ export async function objectExistsWithChecksum(storage: SyncStorage, key: string
     head = await storage.client.send(new HeadObjectCommand({ Bucket: storage.bucket, Key: key, ChecksumMode: 'ENABLED' }))
   } catch (err) {
     if (isMissingS3Object(err)) return false
-    throw err
+    void recordSyncMetric('storage_failures')
+    throw new SyncApiError('Object storage is unavailable', 'SYNC_STORAGE_ERROR', 503)
   }
 
   if (head.ChecksumSHA256 === undefined || head.ContentLength === undefined) return false
   return BigInt(head.ContentLength) === expectedSize && head.ChecksumSHA256 === toS3Checksum(expectedHash)
 }
 
-export async function signUploadUrl(storage: SyncStorage, key: string, hash: string): Promise<string> {
+export async function signUploadUrl(storage: SyncStorage, key: string, hash: string, size: bigint): Promise<string> {
   return getSignedUrl(
     storage.client,
     new PutObjectCommand({
       Bucket: storage.bucket,
       Key: key,
-      ChecksumSHA256: toS3Checksum(hash)
+      ChecksumSHA256: toS3Checksum(hash),
+      ContentLength: Number(size)
     }),
     { expiresIn: storage.signedUrlTtl }
   )
+}
+
+export async function signDownloadUrl(storage: SyncStorage, key: string): Promise<string> {
+  return getSignedUrl(storage.client, new GetObjectCommand({ Bucket: storage.bucket, Key: key }), { expiresIn: storage.signedUrlTtl })
+}
+
+export async function listSyncObjects(storage: SyncStorage, cursor?: string) {
+  const page = await storage.client.send(new ListObjectsV2Command({ Bucket: storage.bucket, Prefix: 'players/', MaxKeys: 1000, ContinuationToken: cursor }))
+  return {
+    objects: (page.Contents ?? []).map((object) => ({ key: object.Key, lastModified: object.LastModified })),
+    nextCursor: page.IsTruncated ? page.NextContinuationToken : undefined
+  }
+}
+
+export async function deleteSyncObject(storage: SyncStorage, key: string): Promise<void> {
+  await storage.client.send(new DeleteObjectCommand({ Bucket: storage.bucket, Key: key }))
 }
 
 export async function verifyUploadedObject(storage: SyncStorage, key: string, size: bigint, hash: string): Promise<void> {
@@ -431,7 +461,8 @@ export async function verifyUploadedObject(storage: SyncStorage, key: string, si
     head = await storage.client.send(new HeadObjectCommand({ Bucket: storage.bucket, Key: key, ChecksumMode: 'ENABLED' }))
   } catch (err) {
     if (isMissingS3Object(err)) throw new SyncApiError('Uploaded object was not found', 'UPLOAD_OBJECT_MISSING', 409)
-    throw err
+    void recordSyncMetric('storage_failures')
+    throw new SyncApiError('Object storage is unavailable', 'SYNC_STORAGE_ERROR', 503)
   }
 
   if (head.ContentLength === undefined || BigInt(head.ContentLength) !== size) {

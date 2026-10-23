@@ -14,7 +14,8 @@
     "serve": "node .",
     "release": "node .github/release.js",
     "docker": "docker compose -f docker/docker-compose.dev.yml up",
-    "docker-down": "docker compose -f docker/docker-compose.dev.yml down --rmi all -v"
+    "docker-down": "docker compose -f docker/docker-compose.dev.yml down --rmi all -v",
+    "test:sync": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1149.0",
