@@ -25,6 +25,7 @@ export const load = (async (event) => {
     })
 
     return {
+      profiles: await db.profile.findMany({ select: { id: true, name: true, syncProfile: { select: { enabled: true } } }, orderBy: { name: 'asc' } }),
       configuration: configuration
         ? {
             region: configuration.region,

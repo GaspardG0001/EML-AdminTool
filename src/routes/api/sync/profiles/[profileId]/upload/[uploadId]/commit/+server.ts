@@ -1,3 +1,4 @@
+import { assertSyncWritable } from '$lib/server/sync-api'
 import { json } from '@sveltejs/kit'
 import { Prisma } from '@prisma/client'
 import { db } from '$lib/server/db'
@@ -18,6 +19,7 @@ export const POST: RequestHandler = async ({ request, params }) => {
   try {
     const player = await authenticateSyncPlayer(request)
     assertSyncEnabled()
+    await assertSyncWritable()
     const syncProfile = await getSyncProfile(params.profileId)
 
     const upload = await db.syncUpload.findFirst({

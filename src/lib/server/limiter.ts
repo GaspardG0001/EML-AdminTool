@@ -86,6 +86,11 @@ export const statsLimiter = new FeatureLimiter({
   actionLimits: [{ windowMs: 10 * 60 * 1000, maxRequests: 10 }]
 })
 
+export const syncActionLimiter = new FeatureLimiter({
+  handshakeWindowMs: 0,
+  actionLimits: [{ windowMs: 60 * 1000, maxRequests: 12000 }]
+})
+
 export const syncHandshakeLimiter = new FeatureLimiter({
   handshakeWindowMs: 0,
   actionLimits: [
@@ -108,6 +113,7 @@ if (!building) {
       const now = Date.now()
       statsLimiter.sweep(now)
       syncHandshakeLimiter.sweep(now)
+      syncActionLimiter.sweep(now)
       crashReportsLimiter.sweep(now)
     },
     60 * 60 * 1000

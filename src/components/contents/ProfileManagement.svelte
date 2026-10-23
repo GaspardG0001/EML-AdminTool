@@ -81,6 +81,9 @@
   }
 </script>
 
+<a href={`/dashboard/profiles/${selectedProfileId}/sync`}>Synchronisation des données joueur</a>
+
+
 {#if showEditProfileModal}
   <AddEditProfileModal bind:show={showEditProfileModal} bind:selectedProfileIdModal bind:selectedProfileId {data} />
 {/if}

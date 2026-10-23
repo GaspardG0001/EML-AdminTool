@@ -6,13 +6,15 @@ import { db } from '$lib/server/db'
 import { decryptS3Credential } from '$lib/server/s3-configuration'
 import { getBearerToken, readLimitedText } from '$lib/server/request'
 import { BusinessError } from '$lib/utils/errors'
-import type { Player, SyncRule } from '@prisma/client'
+import type { Player } from '@prisma/client'
+import { validateFilePath, isSyncPathAllowed } from '$lib/sync/paths'
+import { syncActionLimiter } from './limiter'
+export { isSyncPathAllowed }
 
 const DEFAULT_PLAYER_QUOTA = 5n * 1024n * 1024n * 1024n
 const DEFAULT_MAX_FILE_SIZE = 1024n * 1024n * 1024n
 const DEFAULT_SIGNED_URL_TTL = 900
 const MAX_SIGNED_URL_TTL = 604800
-const MAX_PATH_LENGTH = 1024
 
 export class SyncApiError extends Error {
   constructor(
@@ -222,13 +224,14 @@ export async function authenticateSyncPlayer(request: Request): Promise<Player> 
 
   const player = await db.player.findUnique({ where: { id: payload.playerId } })
   if (!player) throw new SyncApiError('Player identity was not found', 'UNAUTHORIZED', 401)
+  if (!syncActionLimiter.canPerformAction(player.id)) throw new SyncApiError('Too many sync requests', 'TOO_MANY_REQUESTS', 429)
   return player
 }
 
 export async function readSyncJson(request: Request): Promise<unknown> {
   let text: string
   try {
-    text = await readLimitedText(request, 16 * 1024)
+    text = await readLimitedText(request, 512 * 1024)
   } catch (err) {
     if (err instanceof BusinessError) {
       throw new SyncApiError(err.message, String(err.code), err.httpStatus)
@@ -346,58 +349,8 @@ export async function getSyncStorage(): Promise<SyncStorage> {
 }
 
 export function normalizeSyncPath(input: unknown): string {
-  if (typeof input !== 'string' || input.length === 0) {
-    throw new SyncApiError('A file path is required', 'INVALID_PATH', 400)
-  }
-
-  const path = input.replace(/\\/g, '/')
-  if (path.length > MAX_PATH_LENGTH || path.startsWith('/') || /^[a-z]:/i.test(path) || path.includes('\0') || /[\u0000-\u001f\u007f]/.test(path)) {
-    throw new SyncApiError('File path is invalid', 'INVALID_PATH', 400)
-  }
-
-  const segments = path.split('/')
-  if (segments.some((segment) => segment === '..' || segment === '.' || segment.length === 0)) {
-    throw new SyncApiError('File path is invalid', 'INVALID_PATH', 400)
-  }
-
-  return segments.join('/')
-}
-
-function globToRegExp(glob: string): RegExp {
-  const normalized = glob.replace(/\\/g, '/')
-  const segments = normalized.split('/')
-  if (!normalized || normalized.startsWith('/') || segments.some((segment) => segment === '..' || segment === '.' || segment.length === 0)) {
-    throw new SyncApiError('A configured Sync rule has an invalid path', 'SYNC_RULE_INVALID', 500)
-  }
-
-  let expression = '^'
-  for (let index = 0; index < normalized.length; index++) {
-    const character = normalized[index]
-    if (character === '*' && normalized[index + 1] === '*') {
-      if (normalized[index + 2] === '/') {
-        expression += '(?:.*/)?'
-        index += 2
-      } else {
-        expression += '.*'
-        index++
-      }
-    } else if (character === '*') {
-      expression += '[^/]*'
-    } else if (character === '?') {
-      expression += '[^/]'
-    } else {
-      expression += character.replace(/[|\\{}()[\]^$+?.]/g, '\\$&')
-    }
-  }
-
-  return new RegExp(`${expression}$`)
-}
-
-export function isSyncPathAllowed(path: string, rules: SyncRule[]): boolean {
-  const enabledRules = rules.filter((rule) => rule.enabled)
-  const included = enabledRules.filter((rule) => rule.action === 'INCLUDE')
-  if (!included.some((rule) => globToRegExp(rule.path).test(path))) return false
-  return !enabledRules.some((rule) => rule.action === 'EXCLUDE' && globToRegExp(rule.path).test(path))
+  try { return validateFilePath(input) }
+  catch { throw new SyncApiError('File path is invalid', 'INVALID_PATH', 400) }
 }
 
 export function parseUploadRequest(input: unknown): UploadRequest {
@@ -417,7 +370,7 @@ export function parseUploadRequest(input: unknown): UploadRequest {
   if (size > BigInt(Number.MAX_SAFE_INTEGER)) throw new SyncApiError('File is too large', 'FILE_TOO_LARGE', 413)
 
   const baseVersion = body.baseVersion
-  if (baseVersion !== null && (typeof baseVersion !== 'number' || !Number.isSafeInteger(baseVersion) || baseVersion < 0)) {
+  if (baseVersion !== null && (typeof baseVersion !== 'number' || !Number.isSafeInteger(baseVersion) || baseVersion < 1)) {
     throw new SyncApiError('baseVersion must be a non-negative integer or null', 'INVALID_VERSION', 400)
   }
   if (typeof body.deviceId !== 'string' || !body.deviceId || body.deviceId.length > 128) {
