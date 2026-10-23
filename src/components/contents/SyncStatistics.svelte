@@ -5,6 +5,11 @@
 </script>
 
 <h3>Player Sync</h3>
+{#if !statistics.metricsAvailable}
+  <p role="status">
+    Les compteurs d’activité sont temporairement indisponibles. Mettez à jour le schéma Prisma et redémarrez le serveur pour les activer.
+  </p>
+{/if}
 <dl>
   <div>
     <dt>Joueurs</dt>

@@ -47,7 +47,7 @@ export const load = (async (event) => {
         : null
     }
   } catch (err) {
-    console.error('Failed to load S3 configuration:', err)
+    console.error('Failed to load synchronization dashboard:', err)
     throw error(500, { message: NotificationCode.INTERNAL_SERVER_ERROR })
   }
 }) satisfies PageServerLoad

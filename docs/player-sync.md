@@ -6,6 +6,8 @@ Sync is separate from Files Updater. PostgreSQL owns metadata; private S3 object
 
 Regenerate the Prisma client with `npx prisma generate` and apply the schema through the existing deployment flow (`prisma db push`, already run by the Docker entrypoints). This adds the `SyncMetric` table without changing existing file data. No database operation is performed by the source-code implementation itself.
 
+After regenerating the client or changing the schema, restart the development server (or its web container). Hot reload can retain an older Prisma instance in memory. If activity counters are unavailable during an upgrade, Sync and Stats keep showing player/storage statistics with an explicit notice. Counter writes do not participate in file-commit transactions.
+
 Set `SYNC_ENABLED=true` and configure storage at **Dashboard > Sync**. Alternatively supply all of `SYNC_S3_ENDPOINT`, `SYNC_S3_REGION`, `SYNC_S3_BUCKET`, `SYNC_S3_ACCESS_KEY`, `SYNC_S3_SECRET_KEY`. Saved panel configuration takes precedence. `SYNC_S3_FORCE_PATH_STYLE=true` supports endpoints requiring path-style addressing. Storage configuration is validated when used; an incomplete configuration returns 503. With Sync disabled, S3 is never required.
 
 Other settings:

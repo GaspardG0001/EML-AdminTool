@@ -1,3 +1,4 @@
+import { recordSyncMetric } from '$lib/server/sync-metrics'
 import { lockSyncObject } from '$lib/server/sync-maintenance'
 import { assertSyncWritable, checkVersion } from '$lib/server/sync-api'
 import { json } from '@sveltejs/kit'
@@ -144,12 +145,12 @@ export const POST: RequestHandler = async ({ request, params }) => {
           throw new SyncApiError('Upload session is no longer pending', 'UPLOAD_NOT_PENDING', 409)
         }
 
-        await tx.syncMetric.upsert({ where: { name: 'uploads_committed' }, create: { name: 'uploads_committed', count: 1n }, update: { count: { increment: 1n } } })
         return { file, revision: syncState.revision }
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
     )
 
+    await recordSyncMetric('uploads_committed')
     return json({
       success: true,
       file: {
