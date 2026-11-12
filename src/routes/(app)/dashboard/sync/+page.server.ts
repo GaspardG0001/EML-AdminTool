@@ -1,5 +1,6 @@
 import { getSyncStatistics } from '$lib/server/sync-metrics'
-import { error, redirect, type Actions } from '@sveltejs/kit'
+import { getSyncPlayerQuota } from '$lib/server/sync'
+import { error, fail as formFail, redirect, type Actions } from '@sveltejs/kit'
 import { fail } from '$lib/server/action'
 import { db } from '$lib/server/db'
 import { decryptS3Credential, encryptS3Credential } from '$lib/server/s3-configuration'
@@ -65,6 +66,7 @@ export const load = (async (event) => {
     const usage = await db.syncFile.groupBy({ by: ['playerId'], where: { playerId: { in: players.slice(0, 50).map((p) => p.id) }, deleted: false }, _sum: { size: true } })
     return {
       statistics: await getSyncStatistics(), search,
+      playerQuotaBytes: (await getSyncPlayerQuota()).toString(),
       players: players.slice(0, 50).map((p) => ({ ...p, storageBytes: (usage.find((u) => u.playerId === p.id)?._sum.size ?? 0n).toString() })), nextCursor: players.length > 50 ? players[49].id : null,
       canConfigure: event.locals.user?.isAdmin || [1, 3].includes(event.locals.user?.p_sync ?? 0),
       profiles: await db.profile.findMany({ select: { id: true, name: true, syncProfile: { select: { enabled: true } } }, orderBy: { name: 'asc' } }),
@@ -84,7 +86,36 @@ export const load = (async (event) => {
   }
 }) satisfies PageServerLoad
 
-export const actions: Actions = {
+export const actions = {
+  saveQuota: async (event) => {
+    if (!event.locals.user?.isAdmin && ![1, 3].includes(event.locals.user?.p_sync ?? 0)) {
+      event.locals.logStatus = 403
+      return formFail(403, { quotaError: 'Vous ne pouvez pas modifier le quota.' })
+    }
+
+    const value = (await event.request.formData()).get('playerQuotaBytes')
+    if (typeof value !== 'string' || !/^\d{1,19}$/.test(value) || BigInt(value) > 9223372036854775807n) {
+      event.locals.logStatus = 400
+      return formFail(400, { quotaError: 'Indiquez un nombre entier d’octets valide.' })
+    }
+
+    const playerQuotaBytes = BigInt(value)
+    await db.$transaction(async (tx) => {
+      await tx.syncConfiguration.upsert({
+        where: { id: '1' },
+        create: { id: '1', playerQuotaBytes },
+        update: { playerQuotaBytes }
+      })
+      await tx.log.create({
+        data: {
+          userId: event.locals.user!.id,
+          action: 'sync.quota.modified',
+          details: JSON.stringify({ playerQuotaBytes: playerQuotaBytes.toString() })
+        }
+      })
+    })
+    return { quotaSaved: true }
+  },
   save: async (event) => {
     if (!event.locals.user?.isAdmin && ![1, 3].includes(event.locals.user?.p_sync ?? 0)) {
       return fail(event, 403, { failure: NotificationCode.FORBIDDEN })
@@ -164,4 +195,4 @@ export const actions: Actions = {
       throw error(500, { message: NotificationCode.INTERNAL_SERVER_ERROR })
     }
   }
-}
+} satisfies Actions

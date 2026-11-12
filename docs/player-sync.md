@@ -4,7 +4,7 @@ Sync is separate from Files Updater. PostgreSQL owns metadata; private S3 object
 
 ## Deployment
 
-Regenerate the Prisma client with `npx prisma generate` and apply the schema through the existing deployment flow (`prisma db push`, already run by the Docker entrypoints). This adds the `SyncMetric` table without changing existing file data. No database operation is performed by the source-code implementation itself.
+Regenerate the Prisma client with `npx prisma generate` and apply the schema through the existing deployment flow (`prisma db push`, already run by the Docker entrypoints). This adds the `SyncMetric` and `SyncConfiguration` tables without changing existing file data. No database operation is performed by the source-code implementation itself.
 
 After regenerating the client or changing the schema, restart the development server (or its web container). Hot reload can retain an older Prisma instance in memory. If activity counters are unavailable during an upgrade, Sync and Stats keep showing player/storage statistics with an explicit notice. Counter writes do not participate in file-commit transactions.
 
@@ -14,7 +14,7 @@ Other settings:
 
 | Variable | Default |
 | --- | --- |
-| `SYNC_DEFAULT_PLAYER_QUOTA` | 5368709120 bytes |
+| `SYNC_DEFAULT_PLAYER_QUOTA` | 5368709120 bytes; used until a quota is saved in the Sync dashboard |
 | `SYNC_DEFAULT_MAX_FILE_SIZE` | 1073741824 bytes |
 | `SYNC_SIGNED_URL_TTL` | 900 seconds |
 | `SYNC_TOMBSTONE_RETENTION_DAYS` | 90 days |
@@ -26,7 +26,7 @@ The Sync connection check confirms bucket access only. Sync also needs `s3:GetOb
 
 For direct uploads, the launcher must send every header from `uploadHeaders` returned by `upload/prepare`, including the exact `content-length` and `x-amz-checksum-sha256` values. The checksum header is part of the presigned signature.
 
-Open **Profiles > selected profile > Synchronisation** (also linked from Sync), enable Sync, set optional per-player limits and add inclusion/exclusion rules. Exclusions take precedence. Keep administrator-managed Files Updater paths out of personal Sync rules.
+Set the per-player quota under **Dashboard > Sync**. It applies to all of each player's profiles together; existing per-profile storage quotas are retained in the database but ignored. Lowering the quota does not delete data: uploads exceeding the new limit are rejected. Open **Profiles > selected profile > Synchronisation** (also linked from Sync), enable Sync, set the optional file-size limit and add inclusion/exclusion rules. Exclusions take precedence. Keep administrator-managed Files Updater paths out of personal Sync rules.
 
 ## HTTP protocol
 
@@ -35,6 +35,20 @@ All data routes require the existing player bearer token from `/api/sync/auth/ha
 Manifest pages return an object keyed by relative path and `nextCursor`. Send `revision` on subsequent pages; `409 MANIFEST_CHANGED` requires restarting. Default page size is 1000, maximum 5000. Batches accept at most 100 entries; upload batches return per-file results, so partial successful reservations remain explicit. Supply `deviceId` either per upload or on the batch body. Binary content goes directly to S3.
 
 Existing `code` values remain compatible with the original launcher. `error` supplies the specification's `SYNC_*` aliases. Version conflicts include the expected and current versions. Upload quotas count active files plus pending reservations, with credit for replaced content, and are rechecked at commit. Writes pause during global maintenance; configuration, manifests and downloads remain readable.
+
+`GET /api/sync/profiles/{profileId}/usage` returns the authenticated player's effective quota and its breakdown, without requiring S3:
+
+```json
+{
+  "scope": "player",
+  "quotaBytes": "5368709120",
+  "usedBytes": "1234",
+  "reservedBytes": "56",
+  "profiles": [{ "profileId": "profile-id", "usedBytes": "1234", "reservedBytes": "56" }]
+}
+```
+
+All byte values are decimal strings. The totals and breakdown use the same database snapshot. `usedBytes` counts all active logical files, including files hidden by current rules; `reservedBytes` counts unexpired pending upload reservations. Deleted files and expired or completed uploads are excluded. Entries with only reservations are included; an empty scope has an empty `profiles` array. The effective quota is checked against `usedBytes + reservedBytes`, and these values may change immediately after the response. The scope is always `player` and includes every profile. The endpoint requires an enabled Sync profile and a player bearer token.
 
 ## Administration and cleanup
 

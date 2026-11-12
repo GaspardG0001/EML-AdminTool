@@ -23,10 +23,7 @@
   <section class="section">
     <fieldset disabled={!data.canConfigure}>
       <label><input type="checkbox" name="enabled" checked={data.profile.syncProfile?.enabled ?? false} /> Activer la synchronisation</label>
-      <label
-        >Quota par joueur (octets, vide = {data.defaults.maxStorageBytes})
-        <input name="maxStorageBytes" inputmode="numeric" pattern="[0-9]*" value={data.profile.syncProfile?.maxStorageBytes?.toString() ?? ''} />
-      </label>
+      <p>Le quota par joueur est partagé entre tous les profils et se configure sur la page Sync.</p>
       <label
         >Taille maximale par fichier (octets, vide = {data.defaults.maxFileBytes})
         <input name="maxFileBytes" inputmode="numeric" pattern="[0-9]*" value={data.profile.syncProfile?.maxFileBytes?.toString() ?? ''} />

@@ -97,6 +97,8 @@ SYNC_PLAYER_TOKEN_TTL_SECONDS=900
 SYNC_S3_FORCE_PATH_STYLE=false
 ```
 
+`SYNC_DEFAULT_PLAYER_QUOTA` is the per-player quota across all profiles until a value is saved in **Dashboard > Sync**; the dashboard value then takes precedence.
+
 For direct uploads, the launcher must send every header returned in `uploadHeaders`, including the exact `content-length` and `x-amz-checksum-sha256` values. For browser-based launchers, configure the object-storage bucket's CORS policy to allow the launcher origin to perform `PUT` requests with the `x-amz-checksum-sha256` header.
 
 The launcher obtains a player token via `POST /api/sync/auth/handshake`. The route verifies the Microsoft/Minecraft access token against Minecraft Services, derives the player UUID from the verified response (never from a client-supplied UUID), upserts the player and device, and issues a short-lived bearer JWT with audience `eml-sync` and scope `sync-player`. The JWT is signed with `JWT_SECRET_KEY`; the existing profile token is not accepted for player Sync. See [launcher authentication integration](./docs/SYNC-LAUNCHER-AUTH.md) for the request contract and Electron guidance. Sync remains disabled unless `SYNC_ENABLED=true`.

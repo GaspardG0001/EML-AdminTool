@@ -6,6 +6,7 @@ import { db } from '$lib/server/db'
 import {
   assertSyncEnabled,
   getSyncProfile,
+  getSyncPlayerQuota,
   getSyncRuntimeConfig,
   getSyncStorage,
   isSyncPathAllowed,
@@ -59,11 +60,9 @@ export async function prepareSyncUpload(playerId: string, profileId: string, inp
       const actualVersion = currentFile?.version ?? null
       checkVersion(actualVersion, input.baseVersion)
 
-      const quotaScope = {
-        playerId: playerId,
-        ...(syncProfile.maxStorageBytes !== null ? { profileId: profileId } : {})
-      }
-      const [activeFiles, pendingUploads] = await Promise.all([
+      const quotaScope = { playerId }
+      const [quota, activeFiles, pendingUploads] = await Promise.all([
+        getSyncPlayerQuota(tx),
         tx.syncFile.aggregate({
           where: { ...quotaScope, deleted: false },
           _sum: { size: true }
@@ -82,7 +81,6 @@ export async function prepareSyncUpload(playerId: string, profileId: string, inp
       const reservedBytes = input.size > oldSize ? input.size - oldSize : 0n
       const usedBytes = activeFiles._sum.size ?? 0n
       const alreadyReservedBytes = pendingUploads._sum.reservedBytes ?? 0n
-      const quota = syncProfile.maxStorageBytes ?? config.defaultPlayerQuota
       if (usedBytes + alreadyReservedBytes + reservedBytes > quota) {
         throw new SyncApiError('Player storage quota would be exceeded', 'QUOTA_EXCEEDED', 413)
       }

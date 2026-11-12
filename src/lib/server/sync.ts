@@ -7,7 +7,7 @@ import { db } from '$lib/server/db'
 import { decryptS3Credential } from '$lib/server/s3-configuration'
 import { getBearerToken, readLimitedText } from '$lib/server/request'
 import { BusinessError } from '$lib/utils/errors'
-import type { Player } from '@prisma/client'
+import type { Player, Prisma } from '@prisma/client'
 import { validateFilePath, isSyncPathAllowed } from '$lib/sync/paths'
 import { syncActionLimiter } from './limiter'
 export { isSyncPathAllowed }
@@ -302,6 +302,11 @@ export function getSyncRuntimeConfig(): SyncRuntimeConfig {
     defaultMaxFileSize: readNonNegativeBigInt('SYNC_DEFAULT_MAX_FILE_SIZE', DEFAULT_MAX_FILE_SIZE),
     signedUrlTtl: readSignedUrlTtl()
   }
+}
+
+export async function getSyncPlayerQuota(client: Pick<Prisma.TransactionClient, 'syncConfiguration'> = db): Promise<bigint> {
+  const configuration = await client.syncConfiguration.findUnique({ where: { id: '1' }, select: { playerQuotaBytes: true } })
+  return configuration?.playerQuotaBytes ?? getSyncRuntimeConfig().defaultPlayerQuota
 }
 
 export async function getSyncStorage(): Promise<SyncStorage> {

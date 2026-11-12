@@ -293,7 +293,6 @@ model SyncProfile {
 
   enabled         Boolean  @default(false)
 
-  maxStorageBytes BigInt?
   maxFileBytes    BigInt?
 
   createdAt       DateTime @default(now())
@@ -311,7 +310,7 @@ model SyncProfile {
 
 `enabled` permet de désactiver complètement la synchronisation pour un profil.
 
-`maxStorageBytes` définit éventuellement un quota spécifique au profil.
+Le quota de stockage est configuré globalement dans le tableau de bord Sync et s'applique à chaque joueur pour l'ensemble de ses profils. L'ancien champ `maxStorageBytes` du profil est conservé en base, mais ignoré.
 
 `maxFileBytes` définit éventuellement une taille maximale par fichier.
 
@@ -1083,7 +1082,7 @@ Exemple :
 5 GiB
 ```
 
-Le quota spécifique du `SyncProfile` peut remplacer le quota global.
+Le quota est défini dans le tableau de bord Sync et partagé entre tous les profils de chaque joueur.
 
 Le quota doit être vérifié avant la génération d'une URL d'upload.
 

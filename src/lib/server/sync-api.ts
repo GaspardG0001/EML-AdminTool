@@ -4,6 +4,7 @@ import { db } from './db'
 import {
   signDownloadUrl,
   getSyncProfile,
+  getSyncPlayerQuota,
   getSyncRuntimeConfig,
   getSyncStorage,
   verifyUploadedObject,
@@ -46,10 +47,11 @@ export async function syncConfiguration(profileId: string) {
   }
   const profile = await db.syncProfile.findUnique({ where: { profileId }, include: { rules: { orderBy: { id: 'asc' } } } })
   const config = getSyncRuntimeConfig()
+  const quota = await getSyncPlayerQuota()
   return {
     enabled: profile?.enabled ?? false,
     limits: {
-      maxStorageBytes: (profile?.maxStorageBytes ?? config.defaultPlayerQuota).toString(),
+      maxStorageBytes: quota.toString(),
       maxFileBytes: (profile?.maxFileBytes ?? config.defaultMaxFileSize).toString()
     },
     rules: profile?.rules.filter((r) => r.enabled).map(({ path, action }) => ({ path, action })) ?? []
@@ -59,6 +61,49 @@ export async function syncConfiguration(profileId: string) {
 export async function syncRevision(playerId: string, profileId: string) {
   const state = await db.playerSyncState.findUnique({ where: { playerId_profileId: { playerId, profileId } } })
   return { revision: (state?.revision ?? 0n).toString() }
+}
+
+export async function syncUsage(playerId: string, profileId: string) {
+  return db.$transaction(
+    async (tx) => {
+      const profile = await tx.syncProfile.findUnique({ where: { profileId }, select: { enabled: true } })
+      if (!profile) throw new SyncApiError('Sync is not configured for this profile', 'SYNC_PROFILE_NOT_FOUND', 404)
+      if (!profile.enabled) throw new SyncApiError('Sync is disabled for this profile', 'SYNC_DISABLED', 403)
+
+      const where = { playerId }
+      const [quota, files, uploads] = await Promise.all([
+        getSyncPlayerQuota(tx),
+        tx.syncFile.groupBy({ by: ['profileId'], where: { ...where, deleted: false }, _sum: { size: true } }),
+        tx.syncUpload.groupBy({
+          by: ['profileId'],
+          where: { ...where, state: 'PENDING', expiresAt: { gt: new Date() } },
+          _sum: { reservedBytes: true }
+        })
+      ])
+      const profiles = new Map<string, { usedBytes: bigint; reservedBytes: bigint }>()
+      for (const file of files) profiles.set(file.profileId, { usedBytes: file._sum.size ?? 0n, reservedBytes: 0n })
+      for (const upload of uploads) {
+        const usage = profiles.get(upload.profileId) ?? { usedBytes: 0n, reservedBytes: 0n }
+        usage.reservedBytes = upload._sum.reservedBytes ?? 0n
+        profiles.set(upload.profileId, usage)
+      }
+      let usedBytes = 0n
+      let reservedBytes = 0n
+      const breakdown = Array.from(profiles, ([id, usage]) => {
+        usedBytes += usage.usedBytes
+        reservedBytes += usage.reservedBytes
+        return { profileId: id, usedBytes: usage.usedBytes.toString(), reservedBytes: usage.reservedBytes.toString() }
+      }).sort((a, b) => a.profileId.localeCompare(b.profileId))
+      return {
+        scope: 'player',
+        quotaBytes: quota.toString(),
+        usedBytes: usedBytes.toString(),
+        reservedBytes: reservedBytes.toString(),
+        profiles: breakdown
+      }
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead }
+  )
 }
 
 export async function syncManifest(playerId: string, profileId: string, url: URL) {

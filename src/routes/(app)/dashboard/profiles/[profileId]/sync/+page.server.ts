@@ -16,7 +16,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
     canConfigure: locals.user?.isAdmin || [1, 3].includes(locals.user?.p_sync ?? 0),
     profile,
     globallyEnabled: process.env.SYNC_ENABLED === 'true',
-    defaults: { maxStorageBytes: config.defaultPlayerQuota.toString(), maxFileBytes: config.defaultMaxFileSize.toString() }
+    defaults: { maxFileBytes: config.defaultMaxFileSize.toString() }
   }
 }
 
@@ -41,7 +41,7 @@ export const actions: Actions = {
         globToRegExp(normalized)
         return [{ path: normalized, action: actions[i] as 'INCLUDE' | 'EXCLUDE', enabled: form.get(`enabled-${i}`) === 'on' }]
       })
-      const data = { enabled: form.get('enabled') === 'on', maxStorageBytes: limit('maxStorageBytes'), maxFileBytes: limit('maxFileBytes') }
+      const data = { enabled: form.get('enabled') === 'on', maxFileBytes: limit('maxFileBytes') }
       await db.$transaction(async (tx) => {
         const profile = await tx.syncProfile.upsert({
           where: { profileId: params.profileId },
@@ -57,7 +57,6 @@ export const actions: Actions = {
             details: JSON.stringify({
               profileId: params.profileId,
               ...data,
-              maxStorageBytes: data.maxStorageBytes?.toString(),
               maxFileBytes: data.maxFileBytes?.toString(),
               rules
             })

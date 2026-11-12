@@ -281,11 +281,16 @@ model PlayerDevice {
   @@index([playerId])
 }
 
+model SyncConfiguration {
+  id               String @id @default("1")
+  playerQuotaBytes BigInt
+}
+
 model SyncProfile {
   id              String   @id @default(cuid(2))
   profileId       String   @unique
   enabled         Boolean  @default(false)
-  maxStorageBytes BigInt?
+  maxStorageBytes BigInt? // Legacy value; no longer used for quota enforcement.
   maxFileBytes    BigInt?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

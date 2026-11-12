@@ -3,9 +3,10 @@
   import { l } from '$lib/stores/language'
   import getEnv from '$lib/utils/env'
   import S3Configuration from '../../../../components/contents/S3Configuration.svelte'
+  import { enhance } from '$app/forms'
   import type { PageProps } from './$types'
 
-  let { data }: PageProps = $props()
+  let { data, form }: PageProps = $props()
 
   const env = getEnv()
 </script>
@@ -16,6 +17,19 @@
 
 <h2>Sync</h2>
 <section class="section"><SyncStatistics statistics={data.statistics} /></section>
+<section class="section">
+  <h3>Quota de synchronisation</h3>
+  <p>Chaque joueur dispose de ce quota pour l’ensemble de ses profils.</p>
+  {#if form && 'quotaSaved' in form && form.quotaSaved}<p role="status">Quota enregistré.</p>{/if}
+  {#if form && 'quotaError' in form && typeof form.quotaError === 'string'}<p role="alert">{form.quotaError}</p>{/if}
+  <form method="POST" action="?/saveQuota" use:enhance>
+    <fieldset disabled={!data.canConfigure}>
+      <label for="player-quota">Quota par joueur (octets)</label>
+      <input id="player-quota" name="playerQuotaBytes" type="text" inputmode="numeric" pattern="[0-9]+" maxlength="19" value={data.playerQuotaBytes} required />
+      {#if data.canConfigure}<button type="submit">Enregistrer le quota</button>{/if}
+    </fieldset>
+  </form>
+</section>
 <section class="section">
   <h3>Joueurs</h3>
   <form method="GET">

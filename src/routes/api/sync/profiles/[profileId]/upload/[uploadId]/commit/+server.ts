@@ -8,6 +8,7 @@ import {
   assertSyncEnabled,
   authenticateSyncPlayer,
   getSyncProfile,
+  getSyncPlayerQuota,
   getSyncRuntimeConfig,
   getSyncStorage,
   isSyncPathAllowed,
@@ -66,11 +67,9 @@ export const POST: RequestHandler = async ({ request, params }) => {
         if (upload.size > maxFileBytes) {
           throw new SyncApiError('File exceeds the configured size limit', 'FILE_TOO_LARGE', 413)
         }
-        const quotaScope = {
-          playerId: player.id,
-          ...(syncProfile.maxStorageBytes !== null ? { profileId: params.profileId } : {})
-        }
-        const [activeFiles, pendingUploads] = await Promise.all([
+        const quotaScope = { playerId: player.id }
+        const [quota, activeFiles, pendingUploads] = await Promise.all([
+          getSyncPlayerQuota(tx),
           tx.syncFile.aggregate({
             where: { ...quotaScope, deleted: false },
             _sum: { size: true }
@@ -87,7 +86,6 @@ export const POST: RequestHandler = async ({ request, params }) => {
         ])
         const oldSize = currentFile && !currentFile.deleted ? currentFile.size : 0n
         const finalUsage = (activeFiles._sum.size ?? 0n) - oldSize + upload.size + (pendingUploads._sum.reservedBytes ?? 0n)
-        const quota = syncProfile.maxStorageBytes ?? config.defaultPlayerQuota
         if (finalUsage > quota) {
           throw new SyncApiError('Player storage quota would be exceeded', 'QUOTA_EXCEEDED', 413)
         }

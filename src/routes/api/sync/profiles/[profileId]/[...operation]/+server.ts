@@ -9,7 +9,7 @@ import {
   syncErrorResponse,
   SyncApiError
 } from '$lib/server/sync'
-import { deleteSyncFile, objectBody, prepareDownload, syncConfiguration, syncManifest, syncRevision } from '$lib/server/sync-api'
+import { deleteSyncFile, objectBody, prepareDownload, syncConfiguration, syncManifest, syncRevision, syncUsage } from '$lib/server/sync-api'
 import type { RequestHandler } from './$types'
 
 const handle: RequestHandler = async ({ request, params, url }) => {
@@ -20,6 +20,7 @@ const handle: RequestHandler = async ({ request, params, url }) => {
     const operation = params.operation
     if (request.method === 'GET') {
       if (operation === 'config') return Response.json(await syncConfiguration(profileId))
+      if (operation === 'usage') return Response.json(await syncUsage(player.id, profileId))
       await getSyncProfile(profileId)
       if (operation === 'revision') return Response.json(await syncRevision(player.id, profileId))
       if (operation === 'manifest') return Response.json(await syncManifest(player.id, profileId, url))
