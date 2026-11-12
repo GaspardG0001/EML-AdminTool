@@ -86,6 +86,8 @@ export default {
     [NotificationCode.BACKGROUND_INVALID_STATUS]: `Hintergrundstatus ist ungültig.`,
     [NotificationCode.BACKGROUND_ALREADY_EXISTS]: `Ein Hintergrund mit diesem Namen existiert bereits.`,
     [NotificationCode.S3_CONFIGURATION_SAVED]: `S3-Konfiguration erfolgreich gespeichert.`,
+    [NotificationCode.S3_CONNECTION_SUCCESS]: `S3-Verbindung erfolgreich: Der Bucket ist erreichbar.`,
+    [NotificationCode.S3_CONNECTION_FAILED]: `S3-Verbindung fehlgeschlagen`,
     [NotificationCode.S3_ENCRYPTION_KEY_INVALID]: `Der serverseitige S3-Verschlüsselungsschlüssel fehlt oder ist ungültig. Konfigurieren Sie die Anwendung erneut, bevor Sie Zugangsdaten speichern.`,
 
     [NotificationCode.DATABASE_ERROR]: `Datenbankfehler.`,

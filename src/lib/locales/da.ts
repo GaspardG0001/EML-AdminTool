@@ -86,6 +86,8 @@ export default {
     [NotificationCode.BACKGROUND_INVALID_STATUS]: `Baggrundsstatus er ugyldig.`,
     [NotificationCode.BACKGROUND_ALREADY_EXISTS]: `En baggrund med dette navn findes allerede.`,
     [NotificationCode.S3_CONFIGURATION_SAVED]: `S3-konfigurationen blev gemt.`,
+    [NotificationCode.S3_CONNECTION_SUCCESS]: `S3-forbindelsen lykkedes: bucket er tilgængelig.`,
+    [NotificationCode.S3_CONNECTION_FAILED]: `S3-forbindelsen mislykkedes`,
     [NotificationCode.S3_ENCRYPTION_KEY_INVALID]: `Serverens S3-krypteringsnøgle mangler eller er ugyldig. Konfigurer programmet igen, før du gemmer legitimationsoplysninger.`,
 
     [NotificationCode.DATABASE_ERROR]: `Databasefejl.`,

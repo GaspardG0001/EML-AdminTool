@@ -791,9 +791,15 @@ Cas upload nécessaire :
   "uploadRequired": true,
   "uploadId": "cl...",
   "uploadUrl": "https://storage/...",
+  "uploadHeaders": {
+    "content-length": "4194304",
+    "x-amz-checksum-sha256": "<base64 SHA-256>"
+  },
   "expiresAt": "2026-09-23T14:00:00Z"
 }
 ```
+
+Le launcher doit envoyer ces en-têtes tels quels avec le `PUT` direct, sans envoyer le JWT Sync au stockage.
 
 Cas objet déjà présent :
 

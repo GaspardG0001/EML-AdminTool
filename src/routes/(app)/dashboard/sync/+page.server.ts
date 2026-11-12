@@ -2,13 +2,43 @@ import { getSyncStatistics } from '$lib/server/sync-metrics'
 import { error, redirect, type Actions } from '@sveltejs/kit'
 import { fail } from '$lib/server/action'
 import { db } from '$lib/server/db'
-import { encryptS3Credential } from '$lib/server/s3-configuration'
+import { decryptS3Credential, encryptS3Credential } from '$lib/server/s3-configuration'
+import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3'
 import type { PageServerLoad } from './$types'
 import { s3ConfigurationSchema } from '$lib/utils/validations'
 import { NotificationCode } from '$lib/utils/notifications'
 import { ServerError } from '$lib/utils/errors'
 
 const s3ConfigurationId = '1'
+
+// Returns null when the bucket is reachable, otherwise a short error description.
+async function checkS3Connection(config: {
+  region: string
+  bucket: string
+  endpoint: string
+  accessKeyId: string
+  secretAccessKey: string
+}): Promise<string | null> {
+  const client = new S3Client({
+    region: config.region,
+    endpoint: config.endpoint,
+    forcePathStyle: process.env.SYNC_S3_FORCE_PATH_STYLE === 'true',
+    credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey },
+    maxAttempts: 1,
+    requestHandler: { requestTimeout: 10000, connectionTimeout: 5000 }
+  })
+
+  try {
+    await client.send(new HeadBucketCommand({ Bucket: config.bucket }))
+    return null
+  } catch (err) {
+    const name = err instanceof Error ? err.name : 'Error'
+    const status = (err as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode
+    return status ? `${name} (HTTP ${status})` : name
+  } finally {
+    client.destroy()
+  }
+}
 
 export const load = (async (event) => {
   if (!event.locals.user?.isAdmin && !event.locals.user?.p_sync) {
@@ -21,7 +51,8 @@ export const load = (async (event) => {
       select: {
         region: true,
         bucket: true,
-        endpoint: true
+        endpoint: true,
+        accessKeyIdEncrypted: true
       }
     })
 
@@ -42,6 +73,7 @@ export const load = (async (event) => {
             region: configuration.region,
             bucket: configuration.bucket,
             endpoint: configuration.endpoint,
+            accessKeyId: decryptS3Credential(configuration.accessKeyIdEncrypted),
             credentialsConfigured: true
           }
         : null
@@ -89,6 +121,17 @@ export const actions: Actions = {
 
         accessKeyIdEncrypted = encryptS3Credential(accessKeyId)
         secretAccessKeyEncrypted = encryptS3Credential(secretAccessKey)
+      }
+
+      const connectionError = await checkS3Connection({
+        region,
+        bucket,
+        endpoint,
+        accessKeyId: decryptS3Credential(accessKeyIdEncrypted),
+        secretAccessKey: decryptS3Credential(secretAccessKeyEncrypted)
+      })
+      if (connectionError) {
+        return fail(event, 400, { failure: NotificationCode.S3_CONNECTION_FAILED, detail: connectionError })
       }
 
       await db.s3Configuration.upsert({

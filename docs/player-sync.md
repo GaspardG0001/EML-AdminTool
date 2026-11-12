@@ -22,6 +22,10 @@ Other settings:
 
 `JWT_SECRET_KEY` must contain at least 32 bytes. Database S3 credentials use the existing `S3_ENCRYPTION_KEY`. Neither credentials nor player tokens are returned in panel data or logs. The S3 account needs Head/Get/Put/DeleteObject and ListBucket for the private `players/` prefix. SHA-256 object checksums must be supported. Only temporary signed URLs are sent to the launcher.
 
+The Sync connection check confirms bucket access only. Sync also needs `s3:GetObject` (used by `HeadObject` to check and verify uploaded files), `s3:PutObject`, `s3:DeleteObject`, and `s3:ListBucket` for the private `players/` prefix. A successful `aws s3 cp` only confirms that `PutObject` is allowed. With SSE-KMS, checksum retrieval may additionally require `kms:Decrypt` and `kms:GenerateDataKey`. Storage errors include the failed Sync operation, S3 error code, and HTTP status when available.
+
+For direct uploads, the launcher must send every header from `uploadHeaders` returned by `upload/prepare`, including the exact `content-length` and `x-amz-checksum-sha256` values. The checksum header is part of the presigned signature.
+
 Open **Profiles > selected profile > Synchronisation** (also linked from Sync), enable Sync, set optional per-player limits and add inclusion/exclusion rules. Exclusions take precedence. Keep administrator-managed Files Updater paths out of personal Sync rules.
 
 ## HTTP protocol

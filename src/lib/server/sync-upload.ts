@@ -119,7 +119,10 @@ export async function prepareSyncUpload(playerId: string, profileId: string, inp
     ...(uploadUrl
       ? {
           uploadUrl,
-          uploadHeaders: { 'x-amz-checksum-sha256': toS3Checksum(input.hash) },
+          uploadHeaders: {
+            'content-length': input.size.toString(),
+            'x-amz-checksum-sha256': toS3Checksum(input.hash)
+          },
           expiresAt: expiresAt.toISOString()
         }
       : {})

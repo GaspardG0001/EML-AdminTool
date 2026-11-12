@@ -10,6 +10,7 @@
       region: string
       bucket: string
       endpoint: string
+      accessKeyId: string
       credentialsConfigured: boolean
     } | null
   }
@@ -20,7 +21,7 @@
   let region = $state(configuration?.region ?? '')
   let bucket = $state(configuration?.bucket ?? '')
   let endpoint = $state(configuration?.endpoint ?? '')
-  let accessKeyId = $state(configuration?.credentialsConfigured ? credentialMask : '')
+  let accessKeyId = $state(configuration?.accessKeyId ?? '')
   let secretAccessKey = $state(configuration?.credentialsConfigured ? credentialMask : '')
   let credentialsSaved = $state(false)
   let hasCredentials = $derived(Boolean(configuration?.credentialsConfigured || credentialsSaved))
@@ -28,7 +29,6 @@
 
   const enhanceForm: SubmitFunction = ({ formData }) => {
     saving = true
-    if (formData.get('accessKeyId') === credentialMask) formData.set('accessKeyId', '')
     if (formData.get('secretAccessKey') === credentialMask) formData.set('secretAccessKey', '')
 
     return async ({ result, update }) => {
@@ -36,13 +36,15 @@
       await update({ reset: false, invalidateAll: false })
 
       if (result.type === 'failure') {
-        const message = $l.notifications[result.data?.failure as NotificationCode] ?? $l.notifications.INTERNAL_SERVER_ERROR
+        const code = result.data?.failure as NotificationCode
+        let message = $l.notifications[code] ?? $l.notifications.INTERNAL_SERVER_ERROR
+        if (result.data?.detail) message = `${message} : ${result.data.detail}`
         addNotification('ERROR', message)
       } else if (result.type === 'success') {
         credentialsSaved = true
-        accessKeyId = credentialMask
         secretAccessKey = credentialMask
         addNotification('SUCCESS', $l.notifications.S3_CONFIGURATION_SAVED)
+        addNotification('SUCCESS', $l.notifications.S3_CONNECTION_SUCCESS)
       }
 
       await applyAction(result)
@@ -72,9 +74,6 @@
         name="accessKeyId"
         type="text"
         bind:value={accessKeyId}
-        onfocus={() => {
-          if (accessKeyId === credentialMask) accessKeyId = ''
-        }}
         placeholder=""
         autocomplete="off"
         required={!hasCredentials}

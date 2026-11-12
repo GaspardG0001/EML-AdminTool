@@ -86,6 +86,8 @@ export default {
     [NotificationCode.BACKGROUND_INVALID_STATUS]: `背景のステータスが無効です。`,
     [NotificationCode.BACKGROUND_ALREADY_EXISTS]: `この名前の背景は既に存在します。`,
     [NotificationCode.S3_CONFIGURATION_SAVED]: `S3 の設定を保存しました。`,
+    [NotificationCode.S3_CONNECTION_SUCCESS]: `S3 への接続に成功しました。バケットにアクセスできます。`,
+    [NotificationCode.S3_CONNECTION_FAILED]: `S3 への接続に失敗しました`,
     [NotificationCode.S3_ENCRYPTION_KEY_INVALID]: `サーバー側の S3 暗号化キーが見つからないか、無効です。認証情報を保存する前にアプリケーションを再設定してください。`,
 
     [NotificationCode.DATABASE_ERROR]: `データベースエラー。`,

@@ -89,6 +89,8 @@ export default {
     [NotificationCode.BACKGROUND_INVALID_STATUS]: `Background status is invalid.`,
     [NotificationCode.BACKGROUND_ALREADY_EXISTS]: `Background with this name already exists.`,
     [NotificationCode.S3_CONFIGURATION_SAVED]: `S3 configuration saved successfully.`,
+    [NotificationCode.S3_CONNECTION_SUCCESS]: `S3 connection successful: the bucket is accessible.`,
+    [NotificationCode.S3_CONNECTION_FAILED]: `S3 connection failed`,
     [NotificationCode.S3_ENCRYPTION_KEY_INVALID]: `The server-side S3 encryption key is missing or invalid. Reconfigure the application before saving credentials.`,
 
     [NotificationCode.NOT_FOUND_ERROR]: `Not found.`,

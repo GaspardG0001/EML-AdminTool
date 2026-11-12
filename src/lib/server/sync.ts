@@ -412,6 +412,24 @@ export function isMissingS3Object(err: unknown): boolean {
   return candidate.$metadata?.httpStatusCode === 404 || candidate.name === 'NotFound' || candidate.name === 'NoSuchKey'
 }
 
+function storageRequestError(err: unknown, operation: string): SyncApiError {
+  const candidate =
+    err && typeof err === 'object'
+      ? (err as { name?: unknown; Code?: unknown; code?: unknown; $metadata?: { httpStatusCode?: unknown } })
+      : {}
+  const rawCode = candidate.Code ?? candidate.code ?? candidate.name
+  const errorCode = typeof rawCode === 'string' && /^[\da-z._-]{1,64}$/i.test(rawCode) ? rawCode : 'UnknownError'
+  const status = candidate.$metadata?.httpStatusCode
+  const httpStatusCode = typeof status === 'number' && Number.isInteger(status) && status >= 100 && status <= 599 ? status : undefined
+  const statusText = httpStatusCode ? `, HTTP ${httpStatusCode}` : ''
+
+  return new SyncApiError(`Object storage is unavailable during ${operation} (${errorCode}${statusText})`, 'SYNC_STORAGE_ERROR', 503, {
+    operation,
+    storageError: errorCode,
+    ...(httpStatusCode ? { httpStatusCode } : {})
+  })
+}
+
 export async function objectExistsWithChecksum(storage: SyncStorage, key: string, expectedSize: bigint, expectedHash: string): Promise<boolean> {
   let head
   try {
@@ -419,7 +437,7 @@ export async function objectExistsWithChecksum(storage: SyncStorage, key: string
   } catch (err) {
     if (isMissingS3Object(err)) return false
     void recordSyncMetric('storage_failures')
-    throw new SyncApiError('Object storage is unavailable', 'SYNC_STORAGE_ERROR', 503)
+    throw storageRequestError(err, 'upload preflight')
   }
 
   if (head.ChecksumSHA256 === undefined || head.ContentLength === undefined) return false
@@ -435,7 +453,10 @@ export async function signUploadUrl(storage: SyncStorage, key: string, hash: str
       ChecksumSHA256: toS3Checksum(hash),
       ContentLength: Number(size)
     }),
-    { expiresIn: storage.signedUrlTtl }
+    {
+      expiresIn: storage.signedUrlTtl,
+      unhoistableHeaders: new Set(['x-amz-checksum-sha256'])
+    }
   )
 }
 
@@ -462,7 +483,7 @@ export async function verifyUploadedObject(storage: SyncStorage, key: string, si
   } catch (err) {
     if (isMissingS3Object(err)) throw new SyncApiError('Uploaded object was not found', 'UPLOAD_OBJECT_MISSING', 409)
     void recordSyncMetric('storage_failures')
-    throw new SyncApiError('Object storage is unavailable', 'SYNC_STORAGE_ERROR', 503)
+    throw storageRequestError(err, 'upload verification')
   }
 
   if (head.ContentLength === undefined || BigInt(head.ContentLength) !== size) {

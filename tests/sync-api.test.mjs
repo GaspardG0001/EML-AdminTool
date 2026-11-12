@@ -189,12 +189,66 @@ test('quota reservations include pending uploads and replacement credits only th
 test('storage HEAD failure cannot advance metadata or reserve an upload', async () => {
   const previousSend = S3Client.prototype.send
   S3Client.prototype.send = async () => {
-    throw new Error('storage offline')
+    const error = new Error('storage offline')
+    error.name = 'AccessDenied'
+    error.$metadata = { httpStatusCode: 403 }
+    throw error
   }
   try {
-    await assert.rejects(prepare.prepareSyncUpload(player.id, 'profile', input), { code: 'SYNC_STORAGE_ERROR' })
+    await assert.rejects(prepare.prepareSyncUpload(player.id, 'profile', input), (error) => {
+      assert.equal(error.code, 'SYNC_STORAGE_ERROR')
+      assert.equal(error.details.operation, 'upload preflight')
+      assert.equal(error.details.storageError, 'AccessDenied')
+      assert.equal(error.details.httpStatusCode, 403)
+      assert.match(error.message, /AccessDenied, HTTP 403/)
+      return true
+    })
     assert.equal(uploads.length, 0)
     assert.equal(states, 0n)
+  } finally {
+    S3Client.prototype.send = previousSend
+  }
+})
+
+test('presigned uploads return all headers included in the signature', async () => {
+  const previousSend = S3Client.prototype.send
+  S3Client.prototype.send = async () => {
+    const error = new Error('not found')
+    error.name = 'NotFound'
+    error.$metadata = { httpStatusCode: 404 }
+    throw error
+  }
+  try {
+    const result = await prepare.prepareSyncUpload(player.id, 'profile', input)
+    const signedUrl = new URL(result.uploadUrl)
+    assert.equal(result.uploadRequired, true)
+    assert.equal(signedUrl.searchParams.get('X-Amz-SignedHeaders'), 'content-length;host;x-amz-checksum-sha256')
+    assert.equal(signedUrl.searchParams.has('x-amz-checksum-sha256'), false)
+    assert.deepEqual(result.uploadHeaders, {
+      'content-length': '5',
+      'x-amz-checksum-sha256': Buffer.from('a'.repeat(64), 'hex').toString('base64')
+    })
+  } finally {
+    S3Client.prototype.send = previousSend
+  }
+})
+
+test('upload verification reports the storage failure details', async () => {
+  const previousSend = S3Client.prototype.send
+  S3Client.prototype.send = async () => {
+    const error = new Error('storage offline')
+    error.name = 'KMS.AccessDeniedException'
+    error.$metadata = { httpStatusCode: 403 }
+    throw error
+  }
+  try {
+    await assert.rejects(sync.verifyUploadedObject(await sync.getSyncStorage(), 'key', 5n, input.hash), (error) => {
+      assert.equal(error.code, 'SYNC_STORAGE_ERROR')
+      assert.equal(error.details.operation, 'upload verification')
+      assert.equal(error.details.storageError, 'KMS.AccessDeniedException')
+      assert.equal(error.details.httpStatusCode, 403)
+      return true
+    })
   } finally {
     S3Client.prototype.send = previousSend
   }
