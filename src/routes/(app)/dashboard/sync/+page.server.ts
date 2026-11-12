@@ -1,4 +1,3 @@
-import { getSyncStatistics } from '$lib/server/sync-metrics'
 import { getSyncPlayerQuota } from '$lib/server/sync'
 import { error, fail as formFail, redirect, type Actions } from '@sveltejs/kit'
 import { fail } from '$lib/server/action'
@@ -60,14 +59,34 @@ export const load = (async (event) => {
     const search = (event.url.searchParams.get('search') ?? '').slice(0, 100)
     const cursor = event.url.searchParams.get('cursor') || undefined
     const players = await db.player.findMany({
-      where: { ...(search ? { OR: [{ minecraftName: { contains: search, mode: 'insensitive' } }, { minecraftUuid: { contains: search.replace(/-/g, '').toLowerCase() } }] } : {}), ...(cursor ? { id: { gt: cursor } } : {}) },
-      include: { _count: { select: { devices: true, syncFiles: { where: { deleted: false } } } }, syncStates: { select: { updatedAt: true }, orderBy: { updatedAt: 'desc' }, take: 1 } }, orderBy: { id: 'asc' }, take: 51
+      where: {
+        ...(search
+          ? {
+              OR: [
+                { minecraftName: { contains: search, mode: 'insensitive' } },
+                { minecraftUuid: { contains: search.replace(/-/g, '').toLowerCase() } }
+              ]
+            }
+          : {}),
+        ...(cursor ? { id: { gt: cursor } } : {})
+      },
+      include: {
+        _count: { select: { devices: true, syncFiles: { where: { deleted: false } } } },
+        syncStates: { select: { updatedAt: true }, orderBy: { updatedAt: 'desc' }, take: 1 }
+      },
+      orderBy: { id: 'asc' },
+      take: 51
     })
-    const usage = await db.syncFile.groupBy({ by: ['playerId'], where: { playerId: { in: players.slice(0, 50).map((p) => p.id) }, deleted: false }, _sum: { size: true } })
+    const usage = await db.syncFile.groupBy({
+      by: ['playerId'],
+      where: { playerId: { in: players.slice(0, 50).map((p) => p.id) }, deleted: false },
+      _sum: { size: true }
+    })
     return {
-      statistics: await getSyncStatistics(), search,
+      search,
       playerQuotaBytes: (await getSyncPlayerQuota()).toString(),
-      players: players.slice(0, 50).map((p) => ({ ...p, storageBytes: (usage.find((u) => u.playerId === p.id)?._sum.size ?? 0n).toString() })), nextCursor: players.length > 50 ? players[49].id : null,
+      players: players.slice(0, 50).map((p) => ({ ...p, storageBytes: (usage.find((u) => u.playerId === p.id)?._sum.size ?? 0n).toString() })),
+      nextCursor: players.length > 50 ? players[49].id : null,
       canConfigure: event.locals.user?.isAdmin || [1, 3].includes(event.locals.user?.p_sync ?? 0),
       profiles: await db.profile.findMany({ select: { id: true, name: true, syncProfile: { select: { enabled: true } } }, orderBy: { name: 'asc' } }),
       configuration: configuration
@@ -142,9 +161,7 @@ export const actions = {
 
       if (current) {
         accessKeyIdEncrypted = accessKeyId ? encryptS3Credential(accessKeyId) : current.accessKeyIdEncrypted
-        secretAccessKeyEncrypted = secretAccessKey
-          ? encryptS3Credential(secretAccessKey)
-          : current.secretAccessKeyEncrypted
+        secretAccessKeyEncrypted = secretAccessKey ? encryptS3Credential(secretAccessKey) : current.secretAccessKeyEncrypted
       } else {
         if (!accessKeyId || !secretAccessKey) {
           return fail(event, 400, { failure: NotificationCode.MISSING_INPUT })

@@ -81,28 +81,38 @@
   }
 </script>
 
-<a href={`/dashboard/profiles/${selectedProfileId}/sync`}>Synchronisation des données joueur</a>
-
-
 {#if showEditProfileModal}
   <AddEditProfileModal bind:show={showEditProfileModal} bind:selectedProfileIdModal bind:selectedProfileId {data} />
 {/if}
 
-{#if !selectedProfile.isDefault}
-  <form method="POST" action="?/deleteProfile" use:enhance={enhanceForm}>
-    <button type="submit" class="secondary right refuse" aria-label="Delete profile"><i class="fa-solid fa-trash"></i></button>
-  </form>
-{/if}
-<button
-  class="secondary right"
-  onclick={() => {
-    selectedProfileIdModal = selectedProfileId
-    showEditProfileModal = true
-  }}
-  aria-label="Edit profile"
->
-  <i class="fa-solid fa-pen"></i>
-</button>
+<div class="profile-actions">
+  {#if !selectedProfile.isDefault}
+    <form method="POST" action="?/deleteProfile" use:enhance={enhanceForm}>
+      <button type="submit" class="secondary profile-action refuse" aria-label="Delete profile" title="Delete profile">
+        <i class="fa-solid fa-trash"></i>
+      </button>
+    </form>
+  {/if}
+  <a
+    class="not-a profile-action"
+    href={`/dashboard/profiles/${selectedProfileId}/sync`}
+    aria-label="Synchronisation des données joueur"
+    title="Synchronisation des données joueur"
+  >
+    <i class="fa-solid fa-arrows-rotate"></i>
+  </a>
+  <button
+    class="secondary profile-action"
+    onclick={() => {
+      selectedProfileIdModal = selectedProfileId
+      showEditProfileModal = true
+    }}
+    aria-label="Edit profile"
+    title="Edit profile"
+  >
+    <i class="fa-solid fa-pen"></i>
+  </button>
+</div>
 
 <div class="info">
   <h4 style="margin-bottom: 0">{selectedProfile.name}{@html selectedProfile.isDefault ? ' (default profile)' : ''}</h4>
@@ -223,22 +233,50 @@
     }
   }
 
-  button.right {
+  .profile-actions {
     position: absolute;
     right: 0;
     top: 30px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 
-  button.accept {
-    color: #266e26;
+  .profile-actions form {
+    margin: 0;
   }
 
-  button.refuse {
-    right: 58px;
-    color: #6e2626;
+  .profile-actions .profile-action {
+    box-sizing: border-box;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    width: 42px;
+    height: 40px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 5px;
+    background: var(--secondary-color);
+    box-shadow: 0 2px 0 var(--secondary-shadow-dark-color);
+    color: var(--text-dark-color);
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+
+    &:hover {
+      background: var(--secondary-color-hover);
+      box-shadow: 0 2px 0 var(--secondary-shadow-dark-color-hover);
+    }
+
+    &:hover:active {
+      transform: translateY(2px);
+      box-shadow: none;
+      outline: 6px solid var(--primary-tr-color-hover);
+    }
   }
 
-  button.delete {
+  .profile-actions .refuse {
     color: #6e2626;
   }
 
