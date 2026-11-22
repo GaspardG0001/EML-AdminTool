@@ -12,6 +12,7 @@
       endpoint: string
       accessKeyId: string
       credentialsConfigured: boolean
+      credentialsUnreadable?: boolean
     } | null
   }
 
@@ -22,14 +23,13 @@
   let bucket = $state(configuration?.bucket ?? '')
   let endpoint = $state(configuration?.endpoint ?? '')
   let accessKeyId = $state(configuration?.accessKeyId ?? '')
-  let secretAccessKey = $state(configuration?.credentialsConfigured ? credentialMask : '')
+  let secretAccessKey = $state('')
   let credentialsSaved = $state(false)
   let hasCredentials = $derived(Boolean(configuration?.credentialsConfigured || credentialsSaved))
   let saving = $state(false)
 
-  const enhanceForm: SubmitFunction = ({ formData }) => {
+  const enhanceForm: SubmitFunction = () => {
     saving = true
-    if (formData.get('secretAccessKey') === credentialMask) formData.set('secretAccessKey', '')
 
     return async ({ result, update }) => {
       saving = false
@@ -42,7 +42,7 @@
         addNotification('ERROR', message)
       } else if (result.type === 'success') {
         credentialsSaved = true
-        secretAccessKey = credentialMask
+        secretAccessKey = ''
         addNotification('SUCCESS', $l.notifications.S3_CONFIGURATION_SAVED)
         addNotification('SUCCESS', $l.notifications.S3_CONNECTION_SUCCESS)
       }
@@ -53,6 +53,9 @@
 </script>
 
 <form method="POST" action="?/save" use:enhance={enhanceForm}>
+  {#if configuration?.credentialsUnreadable && !credentialsSaved}
+    <p role="alert">Les identifiants S3 enregistrés sont illisibles. Saisissez à nouveau la clé d’accès et la clé secrète.</p>
+  {/if}
   <div class="fields">
     <div>
       <label for="s3-region">{$l.dashboard.s3Configuration.region}</label>
@@ -88,10 +91,7 @@
         name="secretAccessKey"
         type="password"
         bind:value={secretAccessKey}
-        onfocus={() => {
-          if (secretAccessKey === credentialMask) secretAccessKey = ''
-        }}
-        placeholder={hasCredentials ? '' : $l.dashboard.s3Configuration.requiredSecretPlaceholder}
+        placeholder={hasCredentials ? credentialMask : $l.dashboard.s3Configuration.requiredSecretPlaceholder}
         autocomplete="new-password"
         required={!hasCredentials}
         maxlength="4096"
