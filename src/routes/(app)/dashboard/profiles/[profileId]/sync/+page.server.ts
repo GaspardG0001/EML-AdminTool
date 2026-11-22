@@ -1,7 +1,7 @@
 import { error, fail, redirect } from '@sveltejs/kit'
 import { db } from '$lib/server/db'
 import { getSyncRuntimeConfig } from '$lib/server/sync'
-import { globToRegExp } from '$lib/sync/paths'
+import { compileSyncGlob } from '$lib/sync/paths'
 import type { Actions, PageServerLoad } from './$types'
 
 export const load: PageServerLoad = async ({ locals, params }) => {
@@ -38,7 +38,7 @@ export const actions: Actions = {
         if (path === '') return []
         if (typeof path !== 'string' || !['INCLUDE', 'EXCLUDE'].includes(String(actions[i]))) throw new Error('Invalid rule')
         const normalized = path.replace(/\\/g, '/')
-        globToRegExp(normalized)
+        compileSyncGlob(normalized)
         return [{ path: normalized, action: actions[i] as 'INCLUDE' | 'EXCLUDE', enabled: form.get(`enabled-${i}`) === 'on' }]
       })
       const data = { enabled: form.get('enabled') === 'on', maxFileBytes: limit('maxFileBytes') }
