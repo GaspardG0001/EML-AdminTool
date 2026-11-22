@@ -2,7 +2,7 @@
 # Copyright (c) 2026, GoldFrite
 # This script is under the GPL-3.0 license.
 #
-# This script is used to install EML AdminTool v2.8.0-beta1.
+# This script is used to install EML AdminTool v2.8.0-beta.1.
 
 if command -v tput >/dev/null 2>&1; then
   BOLD=$(tput bold)
@@ -34,7 +34,7 @@ echo "                                    | | | | \__ \ || (_| | | |  __/ |   "
 echo "                                    |_|_| |_|___/\__\__,_|_|_|\___|_|   "
 echo "                                                                        "
 echo "                                                                        "
-echo "EML AdminTool v2.8.0-beta1 Installer"
+echo "EML AdminTool v2.8.0-beta.1 Installer"
 echo "Copyright (c) 2026, GoldFrite"
 echo "This script is under the GPL-3.0 license."
 echo ""
@@ -209,7 +209,7 @@ echo "${BOLD}• Installing EML AdminTool...${RESET}"
 echo ""
 echo "This could take a while, please wait..."
 
-URL="https://github.com/Electron-Minecraft-Launcher/EML-AdminTool/releases/download/v2.8.0-beta1/docker-compose.prod.yml"
+URL="https://github.com/Electron-Minecraft-Launcher/EML-AdminTool/releases/download/v2.8.0-beta.1/docker-compose.prod.yml"
 
 COMPOSE_DOWNLOAD=$(mktemp "$INSTALL_DIR/.compose-download.XXXXXX") || exit 1
 if [ "$fetcher" == "curl" ]; then
