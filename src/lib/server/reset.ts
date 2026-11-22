@@ -1,3 +1,4 @@
+import { getS3EncryptionKey } from './s3-configuration'
 import { dev } from '$app/environment'
 import { randomBytes } from 'node:crypto'
 import { defaultPgURL, envPath, resetProcessEnv } from './setup'
@@ -66,10 +67,7 @@ export async function markAsUnconfigured(): Promise<void> {
   resetProcessEnv()
   const databaseUrl = process.env.DATABASE_URL ?? defaultPgURL
   const jwtSecretKey = process.env.JWT_SECRET_KEY ?? randomBytes(64).toString('base64url')
-  const s3EncryptionKey =
-    process.env.S3_ENCRYPTION_KEY && process.env.S3_ENCRYPTION_KEY !== 'undefined'
-      ? process.env.S3_ENCRYPTION_KEY
-      : randomBytes(32).toString('hex')
+  const s3EncryptionKey = getS3EncryptionKey()
 
   const envFile = envPath
 

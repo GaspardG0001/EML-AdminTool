@@ -1,3 +1,4 @@
+import { getS3EncryptionKey } from './s3-configuration'
 import { Client, escapeLiteral } from 'pg'
 import { exec } from 'child_process'
 import { promisify } from 'util'
@@ -210,10 +211,7 @@ export async function markAsConfigured(): Promise<void> {
   const databaseUrl = process.env.DATABASE_URL ?? defaultPgURL
   const jwtSecretKey = process.env.JWT_SECRET_KEY ?? randomBytes(64).toString('base64url')
   const apiToken = process.env.UPDATER_HTTP_API_TOKEN ?? randomBytes(32).toString('hex')
-  const s3EncryptionKey =
-    process.env.S3_ENCRYPTION_KEY && process.env.S3_ENCRYPTION_KEY !== 'undefined'
-      ? process.env.S3_ENCRYPTION_KEY
-      : randomBytes(32).toString('hex')
+  const s3EncryptionKey = getS3EncryptionKey()
 
   const envFile = envPath
 
@@ -305,10 +303,7 @@ function updateEnv(dbPassword: string): void {
   const newDatabaseUrl = `postgresql://eml:${dbPassword}@dbs:5432/eml_admintool`
   const newJwtSecretKey = randomBytes(64).toString('base64url')
   const newApiToken = randomBytes(32).toString('hex')
-  const s3EncryptionKey =
-    process.env.S3_ENCRYPTION_KEY && process.env.S3_ENCRYPTION_KEY !== 'undefined'
-      ? process.env.S3_ENCRYPTION_KEY
-      : randomBytes(32).toString('hex')
+  const s3EncryptionKey = getS3EncryptionKey()
 
   const newEnv = `${defaultEnvHeader}
 ${devWarning}
