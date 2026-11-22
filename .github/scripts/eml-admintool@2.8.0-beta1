@@ -144,6 +144,7 @@ if [ "$os" == "mac" ]; then
 else
   LOCAL_IP=$(hostname -I 2>/dev/null | tr ' ' '\n' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || echo "127.0.0.1")
 fi
+LOCAL_IP=${LOCAL_IP:-127.0.0.1}
 echo "Local IP detected:    $LOCAL_IP"
 
 PUBLIC_IP=""
@@ -210,11 +211,20 @@ echo "This could take a while, please wait..."
 
 URL="https://github.com/Electron-Minecraft-Launcher/EML-AdminTool/releases/download/v2.8.0-beta1/docker-compose.prod.yml"
 
+COMPOSE_DOWNLOAD=$(mktemp "$INSTALL_DIR/.compose-download.XXXXXX") || exit 1
 if [ "$fetcher" == "curl" ]; then
-  curl -sSL "$URL" -o "$INSTALL_DIR/docker-compose.prod.yml"
+  curl --fail --silent --show-error --location "$URL" -o "$COMPOSE_DOWNLOAD"
+  DOWNLOAD_STATUS=$?
 else
-  wget -qO "$INSTALL_DIR/docker-compose.prod.yml" "$URL"
+  wget -qO "$COMPOSE_DOWNLOAD" "$URL"
+  DOWNLOAD_STATUS=$?
 fi
+if [ "$DOWNLOAD_STATUS" -ne 0 ] || [ ! -s "$COMPOSE_DOWNLOAD" ]; then
+  rm -f "$COMPOSE_DOWNLOAD"
+  echo "Failed to download the release configuration. Installation stopped." >&2
+  exit 1
+fi
+mv "$COMPOSE_DOWNLOAD" "$INSTALL_DIR/docker-compose.prod.yml" || exit 1
 
 cd "$INSTALL_DIR" || exit 1
 
@@ -242,4 +252,5 @@ else
   echo ""
   echo "${RED}Failed to start Docker containers.${RESET}"
   echo "Please ensure Docker is running and you have permissions."
+  exit 1
 fi

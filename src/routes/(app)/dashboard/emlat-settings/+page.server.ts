@@ -69,7 +69,7 @@ export const load = (async (event) => {
       throw new ServerError('Failed to load VPS information', err, NotificationCode.INTERNAL_SERVER_ERROR, 500)
     }
 
-    return { environment, users, profiles, userPermissions, vps, update, minecraftVersions }
+    return { environment, users, profiles, userPermissions, vps, update, minecraftVersions, updaterEnabled: process.env.UPDATER_ENABLED !== 'false' }
   } catch (err) {
     if (err instanceof ServerError) throw error(err.httpStatus, { message: err.code })
 

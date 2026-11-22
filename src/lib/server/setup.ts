@@ -263,6 +263,7 @@ export function resetProcessEnv(): void {
 }
 
 export async function restartUpdater(): Promise<void> {
+  if (process.env.UPDATER_ENABLED === 'false') return
   console.log('\n-------------- RESTARTING UPDATER --------------\n')
 
   try {

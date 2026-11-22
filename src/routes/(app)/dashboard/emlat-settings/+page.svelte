@@ -189,7 +189,9 @@ Please note that EML AdminTool, and therefore the Launchers too, will be unavail
 <section class="section">
   <h3>{$l.dashboard.emlatSettings.update.title}</h3>
 
-  {#if data.update.currentVersion.includes('beta') || data.update.latestVersion.includes('alpha')}
+  {#if !data.updaterEnabled}
+    <p>Les mises à jour automatiques sont désactivées pour ce déploiement. Mettez à jour l’image avec Docker Compose.</p>
+  {:else if data.update.currentVersion.includes('beta') || data.update.latestVersion.includes('alpha')}
     <div class="no-update">
       <p><i class="fa-solid fa-times-circle"></i></p>
       <p>
