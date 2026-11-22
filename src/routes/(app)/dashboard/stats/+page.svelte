@@ -6,7 +6,6 @@
   import type { SubmitFunction } from '@sveltejs/kit'
   import type { PageProps } from './$types'
   import Chart from 'chart.js/auto'
-  import SyncStatistics from '../../../../components/contents/SyncStatistics.svelte'
   import { l } from '$lib/stores/language'
   import type { NotificationCode } from '$lib/utils/notifications'
   import { addNotification } from '$lib/stores/notifications'
@@ -294,8 +293,6 @@
     </div>
   </div>
 </section>
-
-{#if data.syncStatistics}<section class="section"><SyncStatistics statistics={data.syncStatistics} /></section>{/if}
 
 <style lang="scss">
   @use '../../../../../static/scss/dashboard.scss';

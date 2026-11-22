@@ -1,0 +1,60 @@
+# # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#            PRE-PRODUCTION CONFIGURATION             #
+#                                                     #
+# This file is used to setup the application in a     #
+# pre-production environment.                         #
+#                                                     #
+# You should only use this once, to deploy the        #
+# application to a server. Please DO NOT use this     #
+# file to restart the application: if the application #
+# has been updated, using this file may downgrade     #
+# the application to an older version.                #
+# You can use `docker start <container_name>` to      #
+# start or restart the application.                   #
+# # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#
+# EML AdminTool v2.7.0
+#
+
+name: eml-admintool-pprd
+
+networks:
+  network:
+
+services:
+  web:
+    image: ghcr.io/electron-minecraft-launcher/eml-admintool:2.7.0
+    restart: unless-stopped
+    networks:
+      - network
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: 'production'
+      BODY_SIZE_LIMIT: 'Infinity'
+    volumes:
+      - files:/app/files
+      - env:/app/env
+      - data:/app/data
+    ports:
+      - '8085:3000'
+    depends_on:
+      - dbs
+  dbs:
+    image: postgres:18.1
+    restart: unless-stopped
+    networks:
+      - network
+    environment:
+      POSTGRES_USER: eml
+      POSTGRES_PASSWORD: eml
+      POSTGRES_DB: eml_admintool
+    volumes:
+      - database:/var/lib/postgresql
+
+volumes:
+  database:
+  files:
+  env:
+  data:
