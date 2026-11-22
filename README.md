@@ -89,7 +89,7 @@ The player upload API uses a two-step flow. `POST /api/sync/profiles/:profileId/
 Set the following server-side variables in `env/.env` to enable uploads. S3 endpoint, bucket and credentials continue to come from the Sync page configuration.
 
 ```env
-SYNC_ENABLED=false
+SYNC_ENABLED=true
 SYNC_DEFAULT_PLAYER_QUOTA=5368709120
 SYNC_DEFAULT_MAX_FILE_SIZE=1073741824
 SYNC_SIGNED_URL_TTL=900
