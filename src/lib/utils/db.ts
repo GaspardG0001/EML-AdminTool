@@ -24,7 +24,7 @@ export const ILoaderType = {
   FORGE: 'FORGE',
   NEOFORGE: 'NEOFORGE',
   FABRIC: 'FABRIC',
-  QUILT: 'QUILT',
+  QUILT: 'QUILT'
 } as const
 
 export const ILoaderFormat = {
@@ -45,6 +45,18 @@ export const IStatAction = {
   BOOTSTRAP: 'BOOTSTRAP'
 } as const
 
+export const ISyncRuleAction = {
+  INCLUDE: 'INCLUDE',
+  EXCLUDE: 'EXCLUDE'
+} as const
+
+export const ISyncUploadState = {
+  PENDING: 'PENDING',
+  COMMITTED: 'COMMITTED',
+  EXPIRED: 'EXPIRED',
+  ABORTED: 'ABORTED'
+} as const
+
 export type UserInfo = {
   id: string
   username: string
@@ -61,6 +73,7 @@ export type UserInfo = {
   p_backgrounds: 0 | 1
   p_stats: 0 | 1 | 2
   p_crashReports: 0 | 1 | 2
+  p_sync: 0 | 1 | 2 | 3
   profilePermissions: UserProfilePermissionInfo[]
 }
 
@@ -85,4 +98,3 @@ export type ProfilePayload = Omit<Profile, 'id' | 'createdAt' | 'updatedAt' | 'i
 export type MaintenancePayload = Omit<Maintenance, 'id'>
 export type NewsPayload = Omit<News, 'id' | 'createdAt' | 'updatedAt'>
 export type CrashReportPayload = Omit<CrashReport, 'id' | 'fileId' | 'createdAt' | 'addressedAt' | 'comment'>
-

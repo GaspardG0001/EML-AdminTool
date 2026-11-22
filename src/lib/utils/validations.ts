@@ -116,7 +116,8 @@ export const editUserSchema = z.object({
   p_stats_1: z.boolean(),
   p_stats_2: z.boolean(),
   p_crashReports_1: z.boolean(),
-  p_crashReports_2: z.boolean()
+  p_crashReports_2: z.boolean(),
+  p_sync: z.number().int().min(0).max(3)
 })
 
 export const editAccountSchema = z
@@ -300,6 +301,25 @@ export const backgroundSchema = z
   .refine((schema) => !(!schema.backgroundId && !schema.file), {
     message: NotificationCode.MISSING_INPUT
   })
+
+export const s3ConfigurationSchema = z.object({
+  region: z.string().trim().min(1).max(128),
+  accessKeyId: z.string().trim().max(256),
+  secretAccessKey: z.string().max(4096),
+  bucket: z.string().trim().min(1).max(255),
+  endpoint: z
+    .string()
+    .trim()
+    .url()
+    .max(2048)
+    .refine((value) => {
+      try {
+        return ['http:', 'https:'].includes(new URL(value).protocol)
+      } catch {
+        return false
+      }
+    })
+})
 
 export const crashReportSchema = z.object({
   crashReportId: z.string(),

@@ -35,6 +35,8 @@ export async function getUpdate(): Promise<{
 }
 
 export async function update(): Promise<void> {
+  if (process.env.UPDATER_ENABLED === 'false')
+    throw new ServerError('Automatic updates are disabled; update this deployment through Docker Compose.', null, NotificationCode.UPDATER_ERROR, 503)
   const updaterHost = `http://upd:4000`
   const apiToken = process.env.UPDATER_HTTP_API_TOKEN
 

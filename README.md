@@ -6,7 +6,7 @@
 
 [<img src="https://img.shields.io/badge/Discord-EML-5561e6?&style=for-the-badge">](https://emlproject.com/discord/github)
 [<img src="https://img.shields.io/badge/platforms-Docker-0077DA?style=for-the-badge&color=0077DA">](#platforms)
-[<img src="https://img.shields.io/badge/version-2.7.0-orangered?style=for-the-badge&color=orangered">](package.json)
+[<img src="https://img.shields.io/badge/version-2.8.0--beta1-orangered?style=for-the-badge&color=orangered">](package.json)
 
 <p>
 <center>
@@ -78,6 +78,31 @@ The _Crash Reports_ feature allows you to collect and analyze crash reports from
 
 _Read the [docs](https://emlproject.pages.dev/docs/eml-admintool/administration-and-features/crash-reports)._
 
+### S3 configuration
+
+The _Sync_ page stores S3 bucket settings in the database. Access key credentials are encrypted with AES-256-GCM using the `S3_ENCRYPTION_KEY` generated during setup (or on first save for existing installations). Keep the generated key in the application's environment file, share it across application instances, and include it in secure backups: without it, saved S3 credentials cannot be decrypted.
+
+### Player Sync upload API
+
+The player upload API uses a two-step flow. `POST /api/sync/profiles/:profileId/upload/prepare` validates the path, device, file size, quota and base version, then returns a short-lived, checksum-bound S3 `PUT` URL. The launcher uploads directly to that URL and calls `POST /api/sync/profiles/:profileId/upload/:uploadId/commit`; the AdminTool never proxies the file contents.
+
+Set the following server-side variables in `env/.env` to enable uploads. S3 endpoint, bucket and credentials continue to come from the Sync page configuration.
+
+```env
+SYNC_ENABLED=true
+SYNC_DEFAULT_PLAYER_QUOTA=5368709120
+SYNC_DEFAULT_MAX_FILE_SIZE=1073741824
+SYNC_SIGNED_URL_TTL=900
+SYNC_PLAYER_TOKEN_TTL_SECONDS=900
+SYNC_S3_FORCE_PATH_STYLE=false
+```
+
+`SYNC_DEFAULT_PLAYER_QUOTA` is the per-player quota across all profiles until a value is saved in **Dashboard > Sync**; the dashboard value then takes precedence.
+
+For direct uploads, the launcher must send every header returned in `uploadHeaders`, including the exact `content-length` and `x-amz-checksum-sha256` values. For browser-based launchers, configure the object-storage bucket's CORS policy to allow the launcher origin to perform `PUT` requests with the `x-amz-checksum-sha256` header.
+
+The launcher obtains a player token via `POST /api/sync/auth/handshake`. The route verifies the Microsoft/Minecraft access token against Minecraft Services, derives the player UUID from the verified response (never from a client-supplied UUID), upserts the player and device, and issues a short-lived bearer JWT with audience `eml-sync` and scope `sync-player`. The JWT is signed with `JWT_SECRET_KEY`; the existing profile token is not accepted for player Sync. See [launcher authentication integration](./docs/SYNC-LAUNCHER-AUTH.md) for the request contract and Electron guidance. Sync remains disabled unless `SYNC_ENABLED=true`.
+
 ## Comparison with other approaches
 
 Managing a modpack server-side can be done in several ways. Here is how EML AdminTool compares to common alternatives.
@@ -114,4 +139,3 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on how to contribute to 
 - This repository contains a `.env` file. All the information in this file is fake (random strings), and will be replaced by the real information when you install EML AdminTool.
 - This Web software is under the `GNU AGPLv3` license; to get more information, please read the file `LICENSE`. It is legally obligatory to respect this license.
 - If you need some help, you can join [this Discord](https://emlproject.com/discord/github).
-

@@ -22,6 +22,7 @@ export const emptyUser: UserInfo & { status: UserStatus; createdAt: Date; update
   p_backgrounds: 0,
   p_stats: 0,
   p_crashReports: 0,
+  p_sync: 0,
   profilePermissions: [],
   createdAt: new Date(),
   updatedAt: new Date()

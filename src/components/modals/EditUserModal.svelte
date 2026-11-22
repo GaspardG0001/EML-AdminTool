@@ -32,6 +32,7 @@
   let p_stats_2 = $state(selectedUser.p_stats === 2)
   let p_crashReports_1 = $state(selectedUser.p_crashReports >= 1)
   let p_crashReports_2 = $state(selectedUser.p_crashReports === 2)
+  let p_sync = $state(selectedUser.p_sync)
   let p_filesUpdater = $state(
     data.profiles.map((profile) => {
       const existing = data.userPermissions.find((p) => p.profileId === profile.id && p.userId === selectedUserId)
@@ -270,6 +271,18 @@
                 if (p_crashReports_2) p_crashReports_1 = true
               }}
             /> Delete crash reports
+          </label>
+        </div>
+      </div>
+
+      <div class="permission">
+        <p>Sync</p>
+        <div class="right">
+          <label class="p" for="p_sync">
+            Player Sync
+            <select id="p_sync" name="p_sync" bind:value={p_sync}>
+              <option value={0}>No access</option><option value={1}>View and configure</option><option value={2}>View only</option><option value={3}>View, configure and delete player data</option>
+            </select>
           </label>
         </div>
       </div>

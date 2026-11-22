@@ -85,6 +85,10 @@ export default {
     [NotificationCode.BACKGROUND_NAME_TOO_LONG]: `背景名は255文字以下で入力してください。`,
     [NotificationCode.BACKGROUND_INVALID_STATUS]: `背景のステータスが無効です。`,
     [NotificationCode.BACKGROUND_ALREADY_EXISTS]: `この名前の背景は既に存在します。`,
+    [NotificationCode.S3_CONFIGURATION_SAVED]: `S3 の設定を保存しました。`,
+    [NotificationCode.S3_CONNECTION_SUCCESS]: `S3 への接続に成功しました。バケットにアクセスできます。`,
+    [NotificationCode.S3_CONNECTION_FAILED]: `S3 への接続に失敗しました`,
+    [NotificationCode.S3_ENCRYPTION_KEY_INVALID]: `サーバー側の S3 暗号化キーが見つからないか、無効です。認証情報を保存する前にアプリケーションを再設定してください。`,
 
     [NotificationCode.DATABASE_ERROR]: `データベースエラー。`,
     [NotificationCode.UPDATER_ERROR]: `アップデーターエラー。`,
@@ -142,6 +146,18 @@ EML AdminToolの翻訳にご協力いただける場合は、GitHubでJSONファ
   },
   dashboard: {
     welcome: `ようこそ、{{username}}さん！`,
+    s3Configuration: {
+      title: `S3 設定`,
+      region: `リージョン`,
+      accessKeyId: `識別子 (Access Key ID)`,
+      secretAccessKey: `アクセスキー`,
+      bucket: `バケット`,
+      endpoint: `エンドポイント`,
+      save: `設定を保存`,
+      requiredSecretPlaceholder: `初回設定時に必須`,
+      endpointPlaceholder: `https://s3.example.com`,
+      saving: `保存中...`
+    },
     emlatSettings: {
       title: `EML AdminToolの設定`,
       info: {

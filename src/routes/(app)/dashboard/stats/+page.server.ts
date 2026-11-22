@@ -112,7 +112,8 @@ export const load = (async (event) => {
       .map((bucket) => {
         const minStats = getStats(ramRawData[bucket].min)
         const maxStats = getStats(ramRawData[bucket].max)
-        return { date: bucket, min: minStats, max: maxStats }
+        return {
+ date: bucket, min: minStats, max: maxStats }
       })
 
     const mappings: Record<string, string> = {

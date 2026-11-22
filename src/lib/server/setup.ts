@@ -1,3 +1,4 @@
+import { getS3EncryptionKey } from './s3-configuration'
 import { Client, escapeLiteral } from 'pg'
 import { exec } from 'child_process'
 import { promisify } from 'util'
@@ -210,6 +211,7 @@ export async function markAsConfigured(): Promise<void> {
   const databaseUrl = process.env.DATABASE_URL ?? defaultPgURL
   const jwtSecretKey = process.env.JWT_SECRET_KEY ?? randomBytes(64).toString('base64url')
   const apiToken = process.env.UPDATER_HTTP_API_TOKEN ?? randomBytes(32).toString('hex')
+  const s3EncryptionKey = getS3EncryptionKey()
 
   const envFile = envPath
 
@@ -228,6 +230,7 @@ IS_CONFIGURED="true"
 DATABASE_URL="${databaseUrl}"
 JWT_SECRET_KEY="${jwtSecretKey}"
 UPDATER_HTTP_API_TOKEN="${apiToken}"
+S3_ENCRYPTION_KEY="${s3EncryptionKey}"
 BODY_SIZE_LIMIT=16M
 `
 
@@ -255,10 +258,12 @@ export function resetProcessEnv(): void {
   if (process.env.DATABASE_URL) delete process.env.DATABASE_URL
   if (process.env.JWT_SECRET_KEY) delete process.env.JWT_SECRET_KEY
   if (process.env.UPDATER_HTTP_API_TOKEN) delete process.env.UPDATER_HTTP_API_TOKEN
+  if (process.env.S3_ENCRYPTION_KEY) delete process.env.S3_ENCRYPTION_KEY
   config({ path: envPath, quiet: true })
 }
 
 export async function restartUpdater(): Promise<void> {
+  if (process.env.UPDATER_ENABLED === 'false') return
   console.log('\n-------------- RESTARTING UPDATER --------------\n')
 
   try {
@@ -299,6 +304,7 @@ function updateEnv(dbPassword: string): void {
   const newDatabaseUrl = `postgresql://eml:${dbPassword}@dbs:5432/eml_admintool`
   const newJwtSecretKey = randomBytes(64).toString('base64url')
   const newApiToken = randomBytes(32).toString('hex')
+  const s3EncryptionKey = getS3EncryptionKey()
 
   const newEnv = `${defaultEnvHeader}
 ${devWarning}
@@ -307,6 +313,7 @@ IS_CONFIGURED="${isConfigured}"
 DATABASE_URL="${newDatabaseUrl}"
 JWT_SECRET_KEY="${newJwtSecretKey}"
 UPDATER_HTTP_API_TOKEN="${newApiToken}"
+S3_ENCRYPTION_KEY="${s3EncryptionKey}"
 BODY_SIZE_LIMIT=16M
 `
 

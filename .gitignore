@@ -24,3 +24,6 @@
 .DS_Store
 env/.env_bkp
 .env
+
+/env/.s3-encryption-key
+/env/.s3-key-*

@@ -85,6 +85,10 @@ export default {
     [NotificationCode.BACKGROUND_NAME_TOO_LONG]: `Le nom du fond d'écran doit faire au plus 255 caractères.`,
     [NotificationCode.BACKGROUND_INVALID_STATUS]: `Statut invalide.`,
     [NotificationCode.BACKGROUND_ALREADY_EXISTS]: `Un fond d'écran avec ce nom existe déjà.`,
+    [NotificationCode.S3_CONFIGURATION_SAVED]: `La configuration S3 a été enregistrée.`,
+    [NotificationCode.S3_CONNECTION_SUCCESS]: `Connexion au S3 réussie : le bucket est accessible.`,
+    [NotificationCode.S3_CONNECTION_FAILED]: `Échec de la connexion au S3`,
+    [NotificationCode.S3_ENCRYPTION_KEY_INVALID]: `La clé de chiffrement S3 côté serveur est absente ou invalide. Reconfigurez l'application avant d'enregistrer les identifiants.`,
 
     [NotificationCode.DATABASE_ERROR]: `Erreur de base de données.`,
     [NotificationCode.UPDATER_ERROR]: `Erreur de l'updater.`,
@@ -141,6 +145,18 @@ Ainsi, si vous souhaitez nous aider à traduire l'EML AdminTool, vous pourrez tr
   },
   dashboard: {
     welcome: `Bienvenue, {{username}} !`,
+    s3Configuration: {
+      title: `Configuration S3`,
+      region: `Région`,
+      accessKeyId: `Identifiant (Access Key ID)`,
+      secretAccessKey: `Clé d'accès`,
+      bucket: `Bucket`,
+      endpoint: `Point de terminaison`,
+      save: `Enregistrer la configuration`,
+      requiredSecretPlaceholder: `Obligatoire lors de la première configuration`,
+      endpointPlaceholder: `https://s3.exemple.com`,
+      saving: `Enregistrement...`
+    },
     emlatSettings: {
       title: `Paramètres de l'EML AdminTool`,
       info: {

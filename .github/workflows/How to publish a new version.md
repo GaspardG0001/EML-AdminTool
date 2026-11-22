@@ -7,6 +7,7 @@ Files to check:
 - `README.md`
 - `src/lib/locales/**.ts`
 - `docker/docker-compose.dev.yml`, `docker/docker-compose.prod.yml`
+- `docker/docker-compose.pprd.yml`
 
 ### 2. Create a change log file
 

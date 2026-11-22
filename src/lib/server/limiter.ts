@@ -86,6 +86,35 @@ export const statsLimiter = new FeatureLimiter({
   actionLimits: [{ windowMs: 10 * 60 * 1000, maxRequests: 10 }]
 })
 
+export const syncActionLimiter = new FeatureLimiter({
+  handshakeWindowMs: 0,
+  actionLimits: [{ windowMs: 60 * 1000, maxRequests: 12000 }]
+})
+
+export const syncHandshakeLimiter = new FeatureLimiter({
+  handshakeWindowMs: 0,
+  actionLimits: [
+    { windowMs: 60 * 1000, maxRequests: 600 },
+    { windowMs: 60 * 60 * 1000, maxRequests: 10000 }
+  ]
+})
+
+const renewalLimiters = new Map<number, FeatureLimiter>()
+export function canRenewSyncPlayer(playerUuid: string, ttlSeconds: number, now = Date.now()): boolean {
+  let limiter = renewalLimiters.get(ttlSeconds)
+  if (!limiter) {
+    limiter = new FeatureLimiter({
+      handshakeWindowMs: 0,
+      actionLimits: [
+        { windowMs: 60 * 1000, maxRequests: 10 },
+        { windowMs: 60 * 60 * 1000, maxRequests: Math.ceil(7200 / ttlSeconds) + 10 }
+      ]
+    })
+    renewalLimiters.set(ttlSeconds, limiter)
+  }
+  return limiter.canPerformAction(playerUuid, now)
+}
+
 export const crashReportsLimiter = new FeatureLimiter({
   handshakeWindowMs: 30 * 60 * 1000,
   actionLimits: [
@@ -99,9 +128,11 @@ if (!building) {
     () => {
       const now = Date.now()
       statsLimiter.sweep(now)
+      syncHandshakeLimiter.sweep(now)
+      for (const limiter of renewalLimiters.values()) limiter.sweep(now)
+      syncActionLimiter.sweep(now)
       crashReportsLimiter.sweep(now)
     },
     60 * 60 * 1000
   )
 }
-

@@ -82,7 +82,7 @@
     </a>
   {/if}
 
-  {#if user.p_bootstraps}
+  {#if user.isAdmin || user.p_bootstraps}
     <a href="/dashboard/bootstraps" class:active={page.url.pathname == '/dashboard/bootstraps'}>
       <i class="fa-solid fa-arrows-rotate"></i>Bootstraps
     </a>
@@ -94,7 +94,7 @@
     </a>
   {/if}
 
-  {#if user.p_news}
+  {#if user.isAdmin || user.p_news}
     <a href="/dashboard/news" class:active={page.url.pathname == '/dashboard/news'}>
       <i class="fa-solid fa-newspaper"></i>News
     </a>
@@ -115,6 +115,12 @@
   {#if user.p_crashReports}
     <a href="/dashboard/crash-reports" class:active={page.url.pathname == '/dashboard/crash-reports'}>
       <i class="fa-solid fa-bug"></i>Crash Reports
+    </a>
+  {/if}
+
+  {#if user.isAdmin || user.p_sync}
+    <a href="/dashboard/sync" class:active={page.url.pathname == '/dashboard/sync'}>
+      <i class="fa-solid fa-arrows-rotate"></i>Sync
     </a>
   {/if}
 
