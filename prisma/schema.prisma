@@ -122,25 +122,26 @@ model Loader {
 }
 
 model Profile {
-  id              String                  @id @default(cuid(2))
-  name            String
-  isDefault       Boolean                 @default(false)
-  slug            String                  @unique
-  ip              String?
-  port            Int?
-  tcpProtocol     String?
-  createdAt       DateTime                @default(now())
-  updatedAt       DateTime                @updatedAt
-  loader          Loader?
-  hidden          Boolean?                @default(false)
-  visibility      ProfileVisibility?      @default(PUBLIC)
-  allowedPseudos  String[]                @default([])
-  password        String?
-  userPermissions UserProfilePermission[]
-  syncProfile     SyncProfile?
-  syncFiles       SyncFile[]
-  syncStates      PlayerSyncState[]
-  syncUploads     SyncUpload[]
+  id               String                  @id @default(cuid(2))
+  name             String
+  isDefault        Boolean                 @default(false)
+  slug             String                  @unique
+  ip               String?
+  port             Int?
+  tcpProtocol      String?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  loader           Loader?
+  hidden           Boolean?                @default(false)
+  visibility       ProfileVisibility?      @default(PUBLIC)
+  allowedPseudos   String[]                @default([])
+  password         String?
+  userPermissions  UserProfilePermission[]
+  syncProfile      SyncProfile?
+  syncFiles        SyncFile[]
+  syncStates       PlayerSyncState[]
+  syncUploads      SyncUpload[]
+  syncPathVersions SyncPathVersion[]
 }
 
 model Bootstrap {
@@ -255,10 +256,11 @@ model Player {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  devices     PlayerDevice[]
-  syncFiles   SyncFile[]
-  syncStates  PlayerSyncState[]
-  syncUploads SyncUpload[]
+  devices          PlayerDevice[]
+  syncFiles        SyncFile[]
+  syncStates       PlayerSyncState[]
+  syncUploads      SyncUpload[]
+  syncPathVersions SyncPathVersion[]
 }
 
 model PlayerDevice {
@@ -336,6 +338,26 @@ model SyncFile {
   @@unique([playerId, profileId, path])
   @@index([playerId, profileId])
   @@index([hash])
+  @@index([objectKey, deleted])
+}
+
+// Compact generations survive tombstone collection and administrative data resets.
+model SyncPathVersion {
+  playerId  String
+  profileId String
+  path      String
+  version   Int
+  player    Player  @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@id([playerId, profileId, path])
+}
+
+model SyncObjectLease {
+  objectKey String   @id
+  expiresAt DateTime
+
+  @@index([expiresAt])
 }
 
 model PlayerSyncState {
@@ -374,6 +396,7 @@ model SyncUpload {
   @@index([playerId, profileId])
   @@index([expiresAt])
   @@index([playerId, profileId, path, state])
+  @@index([objectKey, state, expiresAt])
 }
 
 model SyncMetric {

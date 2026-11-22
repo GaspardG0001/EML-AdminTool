@@ -24,6 +24,8 @@ export const actions: Actions = {
   default: async ({ locals, params, request }) => {
     if (!locals.user?.isAdmin && ![1, 3].includes(locals.user?.p_sync ?? 0)) throw error(403)
     const form = await request.formData()
+    let rules: { path: string; action: 'INCLUDE' | 'EXCLUDE'; enabled: boolean }[]
+    let data: { enabled: boolean; maxFileBytes: bigint | null }
     try {
       const limit = (key: string) => {
         const value = form.get(key)
@@ -34,14 +36,18 @@ export const actions: Actions = {
       const paths = form.getAll('path')
       const actions = form.getAll('action')
       if (paths.length > 200 || paths.length !== actions.length) throw new Error('Invalid rules')
-      const rules = paths.flatMap((path, i) => {
+      rules = paths.flatMap((path, i) => {
         if (path === '') return []
         if (typeof path !== 'string' || !['INCLUDE', 'EXCLUDE'].includes(String(actions[i]))) throw new Error('Invalid rule')
         const normalized = path.replace(/\\/g, '/')
         compileSyncGlob(normalized)
         return [{ path: normalized, action: actions[i] as 'INCLUDE' | 'EXCLUDE', enabled: form.get(`enabled-${i}`) === 'on' }]
       })
-      const data = { enabled: form.get('enabled') === 'on', maxFileBytes: limit('maxFileBytes') }
+      data = { enabled: form.get('enabled') === 'on', maxFileBytes: limit('maxFileBytes') }
+    } catch {
+      return fail(400, { message: 'Vérifiez les limites et les chemins relatifs des règles.' })
+    }
+    try {
       await db.$transaction(async (tx) => {
         const profile = await tx.syncProfile.upsert({
           where: { profileId: params.profileId },
@@ -50,6 +56,7 @@ export const actions: Actions = {
         })
         await tx.syncRule.deleteMany({ where: { syncProfileId: profile.id } })
         await tx.syncRule.createMany({ data: rules.map((r) => ({ ...r, syncProfileId: profile.id })) })
+        await tx.playerSyncState.updateMany({ where: { profileId: params.profileId }, data: { revision: { increment: 1n } } })
         await tx.log.create({
           data: {
             userId: locals.user!.id,
@@ -64,8 +71,9 @@ export const actions: Actions = {
         })
       })
       return { success: true }
-    } catch {
-      return fail(400, { message: 'Vérifiez les limites et les chemins relatifs des règles.' })
+    } catch (err) {
+      console.error('Failed to save profile Sync configuration', err instanceof Error ? err.name : 'UnknownError')
+      return fail(500, { message: 'Impossible d’enregistrer la configuration. Réessayez ultérieurement.' })
     }
   }
 }

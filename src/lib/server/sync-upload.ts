@@ -1,4 +1,4 @@
-import { lockSyncObject } from './sync-maintenance'
+import { lockSyncObject, lockSyncStorage } from './sync-maintenance'
 import { recordSyncMetric } from './sync-metrics'
 import { assertSyncWritable, checkVersion } from '$lib/server/sync-api'
 import { Prisma } from '@prisma/client'
@@ -21,7 +21,7 @@ import type { UploadRequest } from './sync'
 export async function prepareSyncUpload(playerId: string, profileId: string, input: UploadRequest) {
   assertSyncEnabled()
   await assertSyncWritable()
-  const [syncProfile, storage] = await Promise.all([getSyncProfile(profileId), getSyncStorage()])
+  const syncProfile = await getSyncProfile(profileId)
 
   if (!isSyncPathAllowed(input.path, syncProfile.rules)) {
     throw new SyncApiError('This path is not enabled for synchronization', 'PATH_NOT_ALLOWED', 403)
@@ -31,7 +31,7 @@ export async function prepareSyncUpload(playerId: string, profileId: string, inp
     where: {
       playerId_deviceUuid: {
         playerId: playerId,
-        deviceUuid: input.deviceId
+        deviceUuid: input.deviceId.toLowerCase()
       }
     }
   })
@@ -43,10 +43,11 @@ export async function prepareSyncUpload(playerId: string, profileId: string, inp
 
   const objectKey = makeObjectKey(playerId, profileId, input.hash)
   let uploadRequired = true
-  const expiresAt = new Date(Date.now() + storage.signedUrlTtl * 1000)
-
-  const upload = await db.$transaction(
+  const { upload, storage, expiresAt } = await db.$transaction(
     async (tx) => {
+      await lockSyncStorage(tx, true)
+      const storage = await getSyncStorage(tx)
+      const expiresAt = new Date(Date.now() + storage.signedUrlTtl * 1000)
       await lockSyncObject(tx, objectKey)
       const currentFile = await tx.syncFile.findUnique({
         where: {
@@ -81,7 +82,7 @@ export async function prepareSyncUpload(playerId: string, profileId: string, inp
       const reservedBytes = input.size > oldSize ? input.size - oldSize : 0n
       const usedBytes = activeFiles._sum.size ?? 0n
       const alreadyReservedBytes = pendingUploads._sum.reservedBytes ?? 0n
-      if (usedBytes + alreadyReservedBytes + reservedBytes > quota) {
+      if (usedBytes - oldSize + input.size + alreadyReservedBytes > quota) {
         throw new SyncApiError('Player storage quota would be exceeded', 'QUOTA_EXCEEDED', 413)
       }
 
@@ -104,12 +105,12 @@ export async function prepareSyncUpload(playerId: string, profileId: string, inp
         where: { id: device.id },
         data: { lastSeenAt: new Date() }
       })
-      return created
+      return { upload: created, storage, expiresAt }
     },
     { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 30000 }
   )
 
-  const uploadUrl = uploadRequired ? await signUploadUrl(storage, objectKey, input.hash, input.size) : null
+  const uploadUrl = uploadRequired ? await signUploadUrl(storage, objectKey, input.hash, input.size, expiresAt) : null
   await recordSyncMetric('uploads_prepared')
   return {
     uploadRequired,

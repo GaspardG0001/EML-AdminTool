@@ -126,7 +126,7 @@ async function handleSecurityBlocking(event: RequestEvent) {
         headers: {
           'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
           'Access-Control-Allow-Origin': requestOrigin,
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Profile-Token',
           'Access-Control-Allow-Credentials': 'true'
         }
       })

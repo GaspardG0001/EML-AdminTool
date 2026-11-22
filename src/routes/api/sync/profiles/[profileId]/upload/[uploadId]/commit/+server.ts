@@ -7,6 +7,7 @@ import { db } from '$lib/server/db'
 import {
   assertSyncEnabled,
   authenticateSyncPlayer,
+  assertSyncProfileAccess,
   getSyncProfile,
   getSyncPlayerQuota,
   getSyncRuntimeConfig,
@@ -21,6 +22,7 @@ import type { RequestHandler } from './$types'
 export const POST: RequestHandler = async ({ request, params }) => {
   try {
     const player = await authenticateSyncPlayer(request)
+    await assertSyncProfileAccess(request, params.profileId)
     assertSyncEnabled()
     await assertSyncWritable()
     const syncProfile = await getSyncProfile(params.profileId)
@@ -90,7 +92,11 @@ export const POST: RequestHandler = async ({ request, params }) => {
           throw new SyncApiError('Player storage quota would be exceeded', 'QUOTA_EXCEEDED', 413)
         }
 
-        const version = (currentFile?.version ?? 0) + 1
+        const generation = currentFile?.version ?? (await tx.syncPathVersion.findUnique({
+          where: { playerId_profileId_path: { playerId: player.id, profileId: params.profileId, path: upload.path } }
+        }))?.version ?? 0
+        if (generation >= 2147483647) throw new SyncApiError('File version limit has been reached', 'VERSION_LIMIT_REACHED', 409)
+        const version = generation + 1
         const file = await tx.syncFile.upsert({
           where: {
             playerId_profileId_path: {

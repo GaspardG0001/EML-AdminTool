@@ -1,10 +1,11 @@
 import { Prisma } from '@prisma/client'
 import { db } from '$lib/server/db'
-import { syncHandshakeLimiter } from '$lib/server/limiter'
+import { syncHandshakeLimiter, canRenewSyncPlayer } from '$lib/server/limiter'
 import {
   assertSyncAuthConfigured,
   assertSyncEnabled,
   createSyncPlayerToken,
+  getPlayerTokenTtlSeconds,
   parseSyncHandshakeRequest,
   readSyncJson,
   syncErrorResponse,
@@ -24,6 +25,8 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
     assertSyncAuthConfigured()
     const input = parseSyncHandshakeRequest(await readSyncJson(request))
     const verifiedProfile = await verifyMinecraftAccessToken(input.accessToken)
+    if (!canRenewSyncPlayer(verifiedProfile.uuid, getPlayerTokenTtlSeconds()))
+      throw new SyncApiError('Too many player authentication attempts', 'TOO_MANY_REQUESTS', 429)
 
     const player = await db.$transaction(async (tx) => {
       const storedPlayer = await tx.player.upsert({
@@ -78,8 +81,8 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
     })
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2034') {
-      return syncErrorResponse(new SyncApiError('Please retry player authentication', 'AUTH_RETRY_REQUIRED', 409))
+      return syncErrorResponse(new SyncApiError('Please retry player authentication', 'AUTH_RETRY_REQUIRED', 409), false)
     }
-    return syncErrorResponse(err)
+    return syncErrorResponse(err, false)
   }
 }

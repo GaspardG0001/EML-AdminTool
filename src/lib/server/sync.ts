@@ -10,6 +10,7 @@ import { BusinessError } from '$lib/utils/errors'
 import type { Player, Prisma } from '@prisma/client'
 import { validateFilePath, isSyncPathAllowed } from '$lib/sync/paths'
 import { syncActionLimiter } from './limiter'
+import { verifyScopedToken } from './jwt'
 export { isSyncPathAllowed }
 
 const DEFAULT_PLAYER_QUOTA = 5n * 1024n * 1024n * 1024n
@@ -80,7 +81,7 @@ export function assertSyncAuthConfigured(): void {
   getJwtSecret()
 }
 
-function getPlayerTokenTtlSeconds(): number {
+export function getPlayerTokenTtlSeconds(): number {
   const raw = process.env.SYNC_PLAYER_TOKEN_TTL_SECONDS
   if (!raw) return 900
 
@@ -248,12 +249,13 @@ export async function readSyncJson(request: Request): Promise<unknown> {
   }
 }
 
-export function syncErrorResponse(err: unknown): Response {
+export function syncErrorResponse(err: unknown, recordMetrics = true): Response {
   if (err && typeof err === 'object' && 'code' in err && err.code === 'P2034') {
-    return syncErrorResponse(new SyncApiError('Concurrent update; retry synchronization', 'VERSION_CONFLICT', 409))
+    return syncErrorResponse(new SyncApiError('Concurrent update; retry synchronization', 'VERSION_CONFLICT', 409), recordMetrics)
   }
   if (err instanceof SyncApiError) {
-    void recordSyncMetric(err.code === 'VERSION_CONFLICT' ? 'conflicts' : err.code === 'QUOTA_EXCEEDED' ? 'quota_exceeded' : 'request_failures')
+    if (recordMetrics && err.status !== 401 && err.status !== 429)
+      void recordSyncMetric(err.code === 'VERSION_CONFLICT' ? 'conflicts' : err.code === 'QUOTA_EXCEEDED' ? 'quota_exceeded' : 'request_failures')
     const aliases: Record<string, string> = { VERSION_CONFLICT: 'SYNC_CONFLICT', PATH_NOT_ALLOWED: 'SYNC_RULE_NOT_ALLOWED', INVALID_PATH: 'SYNC_INVALID_PATH', FILE_TOO_LARGE: 'SYNC_FILE_TOO_LARGE', QUOTA_EXCEEDED: 'SYNC_QUOTA_EXCEEDED', DEVICE_NOT_FOUND: 'SYNC_INVALID_DEVICE', UPLOAD_NOT_FOUND: 'SYNC_UPLOAD_NOT_FOUND', UPLOAD_EXPIRED: 'SYNC_UPLOAD_EXPIRED', UNAUTHORIZED: 'SYNC_UNAUTHORIZED' }
     return Response.json({ success: false, code: err.code, error: aliases[err.code] ?? err.code, message: err.message, ...err.details }, { status: err.status })
   }
@@ -262,7 +264,7 @@ export function syncErrorResponse(err: unknown): Response {
     return Response.json({ success: false, code: err.code, message: err.message }, { status: err.httpStatus })
   }
 
-  void recordSyncMetric('request_failures')
+  if (recordMetrics) void recordSyncMetric('request_failures')
   // SDK errors can contain signed URLs or request headers.
   console.error('Unexpected Sync API error', err instanceof Error ? err.name : 'unknown')
   return Response.json({ success: false, code: 'INTERNAL_SERVER_ERROR', message: 'Sync request failed' }, { status: 500 })
@@ -309,8 +311,8 @@ export async function getSyncPlayerQuota(client: Pick<Prisma.TransactionClient, 
   return configuration?.playerQuotaBytes ?? getSyncRuntimeConfig().defaultPlayerQuota
 }
 
-export async function getSyncStorage(): Promise<SyncStorage> {
-  const storedConfiguration = await db.s3Configuration.findUnique({ where: { id: '1' } })
+export async function getSyncStorage(databaseClient: Pick<Prisma.TransactionClient, 's3Configuration'> = db): Promise<SyncStorage> {
+  const storedConfiguration = await databaseClient.s3Configuration.findUnique({ where: { id: '1' } })
   const configuration = storedConfiguration ?? (process.env.SYNC_S3_ENDPOINT && process.env.SYNC_S3_REGION && process.env.SYNC_S3_BUCKET && process.env.SYNC_S3_ACCESS_KEY && process.env.SYNC_S3_SECRET_KEY ? { endpoint: process.env.SYNC_S3_ENDPOINT, region: process.env.SYNC_S3_REGION, bucket: process.env.SYNC_S3_BUCKET, updatedAt: new Date(0), accessKeyIdEncrypted: '', secretAccessKeyEncrypted: '' } : null)
   if (!configuration) throw new SyncApiError('S3 storage has not been configured', 'SYNC_STORAGE_NOT_CONFIGURED', 503)
 
@@ -399,7 +401,7 @@ export function parseUploadRequest(input: unknown): UploadRequest {
     hash: body.hash.toLowerCase(),
     size,
     baseVersion,
-    deviceId: body.deviceId
+    deviceId: body.deviceId.toLowerCase()
   }
 }
 
@@ -449,7 +451,10 @@ export async function objectExistsWithChecksum(storage: SyncStorage, key: string
   return BigInt(head.ContentLength) === expectedSize && head.ChecksumSHA256 === toS3Checksum(expectedHash)
 }
 
-export async function signUploadUrl(storage: SyncStorage, key: string, hash: string, size: bigint): Promise<string> {
+export async function signUploadUrl(storage: SyncStorage, key: string, hash: string, size: bigint, expiresAt: Date): Promise<string> {
+  const signingDate = new Date()
+  const expiresIn = Math.min(storage.signedUrlTtl, Math.floor((expiresAt.getTime() - signingDate.getTime()) / 1000))
+  if (expiresIn < 1) throw new SyncApiError('Upload session has expired', 'UPLOAD_EXPIRED', 410)
   return getSignedUrl(
     storage.client,
     new PutObjectCommand({
@@ -459,7 +464,8 @@ export async function signUploadUrl(storage: SyncStorage, key: string, hash: str
       ContentLength: Number(size)
     }),
     {
-      expiresIn: storage.signedUrlTtl,
+      expiresIn,
+      signingDate,
       unhoistableHeaders: new Set(['x-amz-checksum-sha256'])
     }
   )
@@ -502,8 +508,15 @@ export async function verifyUploadedObject(storage: SyncStorage, key: string, si
   }
 }
 
-export async function getSyncProfile(profileId: string) {
-  const syncProfile = await db.syncProfile.findUnique({
+export async function assertSyncProfileAccess(request: Request, profileId: string): Promise<void> {
+  const profile = await db.profile.findUnique({ where: { id: profileId }, select: { slug: true, visibility: true } })
+  if (!profile) throw new SyncApiError('Profile not found', 'SYNC_PROFILE_NOT_FOUND', 404)
+  if (profile.visibility === 'PROTECTED' && !(await verifyScopedToken(request.headers.get('X-Profile-Token'), 'profile', { slug: profile.slug })))
+    throw new SyncApiError('A valid profile token is required', 'PROFILE_UNAUTHORIZED', 401)
+}
+
+export async function getSyncProfile(profileId: string, client: Pick<Prisma.TransactionClient, 'syncProfile'> = db) {
+  const syncProfile = await client.syncProfile.findUnique({
     where: { profileId },
     include: { profile: true, rules: true }
   })

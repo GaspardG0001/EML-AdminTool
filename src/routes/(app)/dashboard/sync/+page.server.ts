@@ -8,6 +8,7 @@ import type { PageServerLoad } from './$types'
 import { s3ConfigurationSchema } from '$lib/utils/validations'
 import { NotificationCode } from '$lib/utils/notifications'
 import { ServerError } from '$lib/utils/errors'
+import { lockSyncStorage } from '$lib/server/sync-maintenance'
 
 const s3ConfigurationId = '1'
 
@@ -46,15 +47,29 @@ export const load = (async (event) => {
   }
 
   try {
-    const configuration = await db.s3Configuration.findUnique({
+    const canConfigure = Boolean(event.locals.user?.isAdmin || [1, 3].includes(event.locals.user?.p_sync ?? 0))
+    const configuration = canConfigure ? await db.s3Configuration.findUnique({
       where: { id: s3ConfigurationId },
       select: {
         region: true,
         bucket: true,
         endpoint: true,
-        accessKeyIdEncrypted: true
+        accessKeyIdEncrypted: true,
+        secretAccessKeyEncrypted: true
       }
-    })
+    }) : null
+    let accessKeyId = ''
+    let credentialsConfigured = false
+    if (configuration) {
+      try {
+        accessKeyId = decryptS3Credential(configuration.accessKeyIdEncrypted)
+        decryptS3Credential(configuration.secretAccessKeyEncrypted)
+        credentialsConfigured = true
+      } catch {
+        console.warn('Stored S3 credentials are unreadable; configuration recovery is available')
+        accessKeyId = ''
+      }
+    }
 
     const search = (event.url.searchParams.get('search') ?? '').slice(0, 100)
     const cursor = event.url.searchParams.get('cursor') || undefined
@@ -87,15 +102,16 @@ export const load = (async (event) => {
       playerQuotaBytes: (await getSyncPlayerQuota()).toString(),
       players: players.slice(0, 50).map((p) => ({ ...p, storageBytes: (usage.find((u) => u.playerId === p.id)?._sum.size ?? 0n).toString() })),
       nextCursor: players.length > 50 ? players[49].id : null,
-      canConfigure: event.locals.user?.isAdmin || [1, 3].includes(event.locals.user?.p_sync ?? 0),
+      canConfigure,
       profiles: await db.profile.findMany({ select: { id: true, name: true, syncProfile: { select: { enabled: true } } }, orderBy: { name: 'asc' } }),
       configuration: configuration
         ? {
             region: configuration.region,
             bucket: configuration.bucket,
             endpoint: configuration.endpoint,
-            accessKeyId: decryptS3Credential(configuration.accessKeyIdEncrypted),
-            credentialsConfigured: true
+            accessKeyId,
+            credentialsConfigured,
+            credentialsUnreadable: !credentialsConfigured
           }
         : null
     }
@@ -182,7 +198,23 @@ export const actions = {
         return fail(event, 400, { failure: NotificationCode.S3_CONNECTION_FAILED, detail: connectionError })
       }
 
-      await db.s3Configuration.upsert({
+      await db.$transaction(async (tx) => {
+        await lockSyncStorage(tx)
+        const latest = await tx.s3Configuration.findUnique({ where: { id: s3ConfigurationId } })
+        if ((latest?.updatedAt.getTime() ?? null) !== (current?.updatedAt.getTime() ?? null))
+          throw new ServerError('Storage configuration changed; reload the form', undefined, NotificationCode.INVALID_INPUT, 409)
+        const previous = latest ?? (process.env.SYNC_S3_BUCKET && process.env.SYNC_S3_ENDPOINT
+          ? { bucket: process.env.SYNC_S3_BUCKET, endpoint: process.env.SYNC_S3_ENDPOINT } : null)
+        if (previous && (previous.bucket !== bucket || new URL(previous.endpoint).href !== new URL(endpoint).href)) {
+          const [files, uploads, leases] = await Promise.all([
+            tx.syncFile.count({ where: { deleted: false } }),
+            tx.syncUpload.count(),
+            tx.syncObjectLease.count({ where: { expiresAt: { gt: new Date() } } })
+          ])
+          if (files || uploads || leases)
+            throw new ServerError('Storage location is still in use', undefined, NotificationCode.INVALID_INPUT, 409)
+        }
+        await tx.s3Configuration.upsert({
         where: { id: s3ConfigurationId },
         create: {
           id: s3ConfigurationId,
@@ -199,11 +231,14 @@ export const actions = {
           bucket,
           endpoint
         }
-      })
+        })
+      }, { isolationLevel: 'Serializable' })
 
       await db.log.create({ data: { userId: event.locals.user!.id, action: 'sync.storage.configuration.modified' } })
       return { success: true }
     } catch (err) {
+      if (err && typeof err === 'object' && 'code' in err && err.code === 'P2034')
+        return fail(event, 409, { failure: NotificationCode.INVALID_INPUT })
       if (err instanceof ServerError) {
         return fail(event, err.httpStatus, { failure: err.code })
       }

@@ -1,6 +1,7 @@
 import { recordSyncMetric } from './sync-metrics'
 import { Prisma } from '@prisma/client'
 import { db } from './db'
+import { lockSyncObject, lockSyncStorage } from './sync-maintenance'
 import {
   signDownloadUrl,
   getSyncProfile,
@@ -36,7 +37,7 @@ export async function assertSyncWritable(): Promise<void> {
 
 export async function getPlayerDevice(playerId: string, deviceUuid: unknown) {
   if (typeof deviceUuid !== 'string') throw new SyncApiError('Invalid device', 'INVALID_DEVICE', 400)
-  const device = await db.playerDevice.findUnique({ where: { playerId_deviceUuid: { playerId, deviceUuid } } })
+  const device = await db.playerDevice.findUnique({ where: { playerId_deviceUuid: { playerId, deviceUuid: deviceUuid.toLowerCase() } } })
   if (!device) throw new SyncApiError('Device does not belong to player', 'DEVICE_NOT_FOUND', 403)
   return device
 }
@@ -107,7 +108,6 @@ export async function syncUsage(playerId: string, profileId: string) {
 }
 
 export async function syncManifest(playerId: string, profileId: string, url: URL) {
-  const profile = await getSyncProfile(profileId)
   const limit = Number(url.searchParams.get('limit') ?? 1000)
   const cursor = url.searchParams.get('cursor')
   if (!Number.isInteger(limit) || limit < 1 || limit > 5000 || (cursor && cursor.length > 128))
@@ -115,6 +115,7 @@ export async function syncManifest(playerId: string, profileId: string, url: URL
   // Each page and its revision come from the same database snapshot.
   return db.$transaction(
     async (tx) => {
+      const profile = await getSyncProfile(profileId, tx)
       const state = await tx.playerSyncState.findUnique({ where: { playerId_profileId: { playerId, profileId } } })
       const revision = (state?.revision ?? 0n).toString()
       if (url.searchParams.has('revision') && url.searchParams.get('revision') !== revision)
@@ -146,13 +147,26 @@ export async function prepareDownload(playerId: string, profileId: string, input
   const path = normalizeSyncPath(objectBody(input).path)
   const profile = await getSyncProfile(profileId)
   if (!isSyncPathAllowed(path, profile.rules)) throw new SyncApiError('Path is not allowed', 'PATH_NOT_ALLOWED', 403)
-  const file = await db.syncFile.findUnique({ where: { playerId_profileId_path: { playerId, profileId, path } } })
-  if (!file || file.deleted || !file.objectKey) throw new SyncApiError('File not found', 'SYNC_FILE_NOT_FOUND', 404)
-  const storage = await getSyncStorage()
-  await verifyUploadedObject(storage, file.objectKey, file.size, file.hash!)
-  const downloadUrl = await signDownloadUrl(storage, file.objectKey)
+  const result = await db.$transaction(async (tx) => {
+    await lockSyncStorage(tx, true)
+    const storage = await getSyncStorage(tx)
+    const file = await tx.syncFile.findUnique({ where: { playerId_profileId_path: { playerId, profileId, path } } })
+    if (!file || file.deleted || !file.objectKey) throw new SyncApiError('File not found', 'SYNC_FILE_NOT_FOUND', 404)
+    await lockSyncObject(tx, file.objectKey)
+    // Recheck after locking: collection may have won the race before this request.
+    await verifyUploadedObject(storage, file.objectKey, file.size, file.hash!)
+    const downloadUrl = await signDownloadUrl(storage, file.objectKey)
+    const expiresAt = new Date(Date.now() + storage.signedUrlTtl * 1000)
+    const lease = await tx.syncObjectLease.findUnique({ where: { objectKey: file.objectKey } })
+    await tx.syncObjectLease.upsert({
+      where: { objectKey: file.objectKey },
+      create: { objectKey: file.objectKey, expiresAt },
+      update: { expiresAt: lease && lease.expiresAt > expiresAt ? lease.expiresAt : expiresAt }
+    })
+    return { path, hash: file.hash, size: file.size.toString(), version: file.version, downloadUrl }
+  }, { timeout: 30000, isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
   await recordSyncMetric('downloads_prepared')
-  return { path, hash: file.hash, size: file.size.toString(), version: file.version, downloadUrl }
+  return result
 }
 
 export async function deleteSyncFile(playerId: string, profileId: string, input: unknown) {

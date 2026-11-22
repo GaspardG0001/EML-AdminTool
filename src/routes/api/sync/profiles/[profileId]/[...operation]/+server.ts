@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import {
   assertSyncEnabled,
   authenticateSyncPlayer,
+  assertSyncProfileAccess,
   getSyncProfile,
   parseUploadRequest,
   readSyncJson,
@@ -17,6 +18,7 @@ const handle: RequestHandler = async ({ request, params, url }) => {
     const player = await authenticateSyncPlayer(request)
     assertSyncEnabled()
     const profileId = params.profileId
+    await assertSyncProfileAccess(request, profileId)
     const operation = params.operation
     if (request.method === 'GET') {
       if (operation === 'config') return Response.json(await syncConfiguration(profileId))
@@ -29,14 +31,19 @@ const handle: RequestHandler = async ({ request, params, url }) => {
       const body = objectBody(await readSyncJson(request))
       if (!Array.isArray(body.files) || !body.files.length || body.files.length > 100)
         throw new SyncApiError('Expected 1 to 100 files', 'INVALID_REQUEST', 400)
-      const inputs = body.files.map((file) => parseUploadRequest({ ...objectBody(file), deviceId: objectBody(file).deviceId ?? body.deviceId }))
       const files = []
-      for (const input of inputs) {
+      for (const file of body.files) {
+        let path: unknown = null
         try {
+          const entry = objectBody(file)
+          path = typeof entry.path === 'string' ? entry.path : null
+          const input = parseUploadRequest({ ...entry, deviceId: entry.deviceId ?? body.deviceId })
           files.push({ path: input.path, ...(await prepareSyncUpload(player.id, profileId, input)) })
         } catch (err) {
+          if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2034')
+            err = new SyncApiError('Concurrent modification; retry', 'VERSION_CONFLICT', 409)
           if (!(err instanceof SyncApiError)) throw err
-          files.push({ path: input.path, error: err.code, message: err.message, status: err.status })
+          files.push({ path, error: err.code, message: err.message, status: err.status })
         }
       }
       return Response.json({ files })
